@@ -10,6 +10,7 @@ globalThis.Hooks={
 class Base {
   constructor() { Base.last=this; }
   async _prepareContext(){return {};}
+  async _preRender(){}
   _onRender(){}
   render(){return this;}
 }
@@ -136,12 +137,43 @@ current.chaos=4;
 await module.api.resetDay();
 assert.equal(current.day,1);
 assert.equal(current.supply.die,6);
-assert.equal(current.supply.lastDay,1);
+assert.equal(current.supply.lastDay,0); // Reset Day must unlock Check Supply
+assert.equal((await appRef._prepareContext()).canRollSupply,true);
 assert.equal(current.chaos,4);
 assert.deepEqual(current.assignments,{});
 assert.deepEqual(current.history,{});
 assert.equal(current.site.scout,null);
 assert.equal(current.site.guide,null);
+// The next supply check uses the already depleted d6, once only.
+// Resetting twice should consistently unlock the daily check without resupplying.
+current.supply.lastDay=current.day;
+await module.api.resetDay();
+assert.equal(current.supply.lastDay,0);
+assert.equal(current.supply.die,6);
+// Re-rendering must preserve vertical/horizontal scroll and expanded references.
+const oldBoard={scrollTop:498,scrollLeft:16};
+const oldContent={scrollTop:42};
+const oldTables=[{scrollLeft:100},{scrollLeft:29},{scrollLeft:75}];
+const oldRefs=[{open:false},{open:true},{open:false}];
+const elementFor=(board,content,tables,refs)=>({
+  querySelector:selector=>selector===".ce-board"?board:selector===".window-content"?content:null,
+  querySelectorAll:selector=>selector===".ce-scroll"?tables:selector==="details.ce-reference"?refs:[]
+});
+appRef.element=elementFor(oldBoard,oldContent,oldTables,oldRefs);
+await appRef._preRender({},{});
+const nextBoard={scrollTop:0,scrollLeft:0};
+const nextContent={scrollTop:0};
+const nextTables=[{scrollLeft:0},{scrollLeft:0},{scrollLeft:0}];
+const nextRefs=[{open:false},{open:false},{open:false}];
+appRef.element=elementFor(nextBoard,nextContent,nextTables,nextRefs);
+appRef._restoreBoardView();
+assert.equal(nextBoard.scrollTop,498);
+assert.equal(nextBoard.scrollLeft,16);
+assert.equal(nextContent.scrollTop,42);
+assert.deepEqual(nextTables.map(x=>x.scrollLeft),[100,29,75]);
+assert.deepEqual(nextRefs.map(x=>x.open),[false,true,false]);
+const css=(await import("node:fs")).readFileSync(new URL("../styles/camp-exploration.css",import.meta.url),"utf8");
+assert(css.includes(".ce-scroll button.ce-pick") && css.includes("height:auto !important"));
 // Socket requests from players must not be able to reset the board.
 await send('resetDay',{userId:'p1',fromGM:true});
 assert.deepEqual(current.assignments,{});

@@ -231,9 +231,11 @@ function mutate(action, payload) {
     } else if (action === "advance") {
       state.day+=1; state.site={scout:null,guide:null,outcome:null}; state.history={};
     } else if (action === "resetDay") {
-      // Retry the CURRENT day: no changes to day number, supply, DC or chaos.
+      // Re-run the CURRENT day: clear its rolls and assignments, including the
+      // once-per-day supply-check lock. Depletion is not undone and no supplies
+      // are granted back; the journey day, DC and chaos are also unchanged.
       state.assignments={}; state.history={}; state.site={scout:null,guide:null,outcome:null};
-      // Supply status is NOT rewound: the prior depletion/check remains recorded.
+      state.supply.lastDay=0;
     } else if (action === "resupply") {
       const die=Number(payload.value);
       if (![8,10,12].includes(die)) return;
@@ -263,6 +265,46 @@ function send(action,payload={}) {
 }
 
 class CampBoard extends HandlebarsApplicationMixin(ApplicationV2) {
+  // ApplicationV2 replaces the board HTML on every state update, so restore
+  // each client's own scroll position and expanded reference sections. This
+  // runs for role changes, dice rolls, supply checks, and remote refreshes.
+  _captureBoardView() {
+    const root=this.element;
+    if (!root) return null;
+    const board=root.querySelector(".ce-board");
+    const content=root.querySelector(".window-content");
+    if (!board) return null;
+    return {
+      boardTop:board.scrollTop, boardLeft:board.scrollLeft,
+      contentTop:content?.scrollTop ?? 0,
+      tableLefts:[...root.querySelectorAll(".ce-scroll")].map(el=>el.scrollLeft),
+      referenceOpen:[...root.querySelectorAll("details.ce-reference")].map(el=>el.open)
+    };
+  }
+  _restoreBoardView() {
+    const view=this._boardView;
+    this._boardView=null;
+    if (!view || !this.element) return;
+    const root=this.element;
+    // Expand references first: opening details changes document height.
+    root.querySelectorAll("details.ce-reference").forEach((el,i)=>{
+      if (i < view.referenceOpen.length) el.open=view.referenceOpen[i];
+    });
+    root.querySelectorAll(".ce-scroll").forEach((el,i)=>{
+      if (i < view.tableLefts.length) el.scrollLeft=view.tableLefts[i];
+    });
+    const content=root.querySelector(".window-content");
+    if (content) content.scrollTop=view.contentTop;
+    const board=root.querySelector(".ce-board");
+    if (board) {
+      board.scrollTop=view.boardTop;
+      board.scrollLeft=view.boardLeft;
+    }
+  }
+  async _preRender(context, options) {
+    this._boardView=this._captureBoardView();
+    await super._preRender(context,options);
+  }
   static DEFAULT_OPTIONS = {
     id:"camp-exploration-board",
     classes:["camp-exploration"],
@@ -326,6 +368,7 @@ class CampBoard extends HandlebarsApplicationMixin(ApplicationV2) {
   }
   _onRender(context, options) {
     super._onRender(context,options);
+    this._restoreBoardView();
     const root=this.element;
     root.querySelectorAll("[data-ce-field]").forEach(el=>el.addEventListener("change",event=>{
       const target=event.currentTarget;
@@ -344,7 +387,7 @@ class CampBoard extends HandlebarsApplicationMixin(ApplicationV2) {
         if (!game.user.isGM) return;
         if (["resetDay","advance","reset"].includes(action)) {
           const question = action === "resetDay"
-            ? "Reset the current day? This clears all duty and watch assignments, campsite-finding checks and recorded rolls. The day number, supply die and supply check, chaos factor, and character resources stay unchanged."
+            ? "Reset the current day? Clear all role and watch assignments, campsite-finding checks and recorded rolls, and unlock today's supply check? The day number, current supply die size, chaos factor and character resources remain unchanged."
             : action === "reset" ? "Start a new expedition from day 1? This clears all assignments and recorded rolls."
             : "Move to the next journey day? Existing role assignments remain.";
           if (!await DialogV2.confirm({window:{title:"Confirm journey change"},content:`<p>${question}</p>`})) return;

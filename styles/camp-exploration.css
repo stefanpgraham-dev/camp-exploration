@@ -84,3 +84,22 @@
 .ce-role-dialog .ce-skill-row { margin-top:4px; }
 
 .ce-skill--partial { color:#765418; background:#f6e6b8; border-color:#d8b875; }
+
+/* v0.2.1 — role buttons expand with their skills; no fixed Foundry button height. */
+.camp-exploration .ce-scroll table,
+.camp-exploration .ce-scroll tbody tr,
+.camp-exploration .ce-scroll tbody td { height:auto !important; max-height:none; }
+.camp-exploration .ce-scroll tbody td { vertical-align:middle; overflow:visible; padding-top:9px; padding-bottom:9px; }
+.camp-exploration .ce-scroll button.ce-pick {
+  display:flex; flex-direction:column; align-items:stretch; justify-content:center;
+  gap:5px; box-sizing:border-box; height:auto !important; min-height:38px;
+  max-height:none !important; overflow:visible; line-height:1.3;
+  white-space:normal; padding:8px 9px;
+}
+.camp-exploration .ce-scroll .ce-pick-title { min-height:16px; flex-shrink:0; }
+.camp-exploration .ce-scroll .ce-pick .ce-skill-row {
+  display:flex; flex-wrap:wrap; align-content:flex-start; align-items:center;
+  gap:4px; min-height:0; margin:0; overflow:visible;
+}
+.camp-exploration .ce-scroll .ce-pick .ce-skill { flex:0 0 auto; }
+.camp-exploration .ce-scroll { padding-bottom:3px; }

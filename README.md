@@ -13,7 +13,7 @@ A small shared party board for a D&D 5e homebrew travel and camping procedure. D
 - A daily **supply die** roll reduces the current die on 1 or 2: d12 → d10 → d8 → d6 → d4 → depleted. GM resupply sets the die to d8 (party), d10 (pack animals), or d12 (wagons).
 - The image's **Chaos Factor** starts at 3 and can be adjusted by the GM; it does not itself trigger events.
 - GM-only **Party rest** applies a short/long rest to each unique player-assigned D&D 5e character. Short rests open each actor’s native rest/Hit Dice dialog; long rests run the system workflow automatically. A rest does **not** advance/reset the journey day.
-- GM-only **Reset day** clears the current day’s exploration, camp, finder and watch assignments, rolls and campsite result. The day number, depleted supplies, whether today’s supply check has already been made, chaos factor and character resources are **not** rewound. **Next day** advances the number, clears results but retains role assignments.
+- GM-only **Reset day** clears the current day’s exploration, camp, finder and watch assignments, rolls and campsite result, and **unlocks Check Supply** for a new roll. The day number, current depleted supply die, chaos factor and character resources remain unchanged. **Next day** advances the number, clears results but retains role assignments.
 
 ## Installation
 
@@ -43,7 +43,7 @@ The generated release manifest contains the correct `manifest` and `download` li
 To build without GitHub Actions:
 
 ```bash
-python tools/package.py --repo stefanpgraham-dev/camp-exploration --version 0.2.0
+python tools/package.py --repo stefanpgraham-dev/camp-exploration --version 0.2.1
 ```
 
 Upload both files from `dist/` as assets on the same GitHub release.
@@ -53,9 +53,10 @@ Upload both files from `dist/` as assets on the same GitHub release.
 - Each player must have a **character assigned in Foundry User Configuration**, and a GM must be online for shared updates.
 - Standard skill roles require proficiency in the **first-listed skill**; assignments without that proficiency are rejected. Roles whose first proficiency is a **tool** cannot be validated generically across D&D 5e versions and must be checked by the table.
 - For tool, map, instrument, generic downtime checks, enter the final roll modifier manually. These still produce a proper d20 chat roll and natural-1/20 prompts, but do not automatically include D&D 5e effects. This avoids assuming a tool proficiency the character may not possess.
+- Selected role buttons expand to show their proficiency badges without clipping. The party board preserves vertical and horizontal scroll and expanded skill references after any state refresh, including changes made by other players.
 - `Full Rest` is a campsite duty choice with no roll. It is a **role label**, not an automated Foundry long rest.
 - GM chooses DC 0/5/10/15/20/25/30. Rolls compare against **total >= DC**, independent of any natural 1/20.
-- Existing role selections persist after **Next day**. **Reset day** clears current-day selections and results without changing supply history or the day number. **Start new expedition** clears selections and rolls and resets the day to 1, but deliberately does not resupply. Choose the appropriate resupply size separately.
+- Existing role selections persist after **Next day**. **Reset day** clears current-day selections and results and unlocks **Check Supply**, while preserving the current supply die size and day number. **Start new expedition** clears selections and rolls and resets the day to 1, but deliberately does not resupply. Choose the appropriate resupply size separately.
 - The module enforces one campsite Scout and one campsite Guide; watch positions can have more than one volunteer.
 - A natural 1 or 20 provides a **GM adjudication prompt only**, without an effect table or automatic fatigue/encounter changes.
 
@@ -68,4 +69,4 @@ Upload both files from `dist/` as assets on the same GitHub release.
 
 ## Developer notes
 
-Source module id: `camp-exploration`. No external dependencies. Version `0.2.0`.
+Source module id: `camp-exploration`. No external dependencies. Version `0.2.1`.
