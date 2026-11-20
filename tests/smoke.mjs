@@ -60,7 +60,7 @@ globalThis.game={user:gm, users,
   socket:{on:(channel,fn)=>handlers[channel]=fn,emit:(channel,data)=>handlers[channel]?.(data)},
   keybindings:{register:()=>{}},modules:{get:()=>module}
 };
-await import('../scripts/camp-exploration.mjs');
+const rules=await import('../scripts/camp-exploration.mjs');
 for(const cb of callbacks.init||[])await cb();
 for(const cb of callbacks.ready||[])await cb();
 assert(typeof module.api.open==='function');
@@ -68,6 +68,108 @@ module.api.open();
 const appRef=Base.last;
 const context = await appRef._prepareContext();
 assert.equal(context.playerCount,2);
+// Verify EVERY role against the supplied exploration/campsite rules sheet.
+const catalogueMatrix={
+  exploration:[
+    ["guide",["nat","his","inv","map"],["nat"],["his","inv","map"]],
+    ["scout",["prc","sur","ste"],["prc"],["sur","ste"]],
+    ["navigator",["navigator","sur"],["navigator"],["sur"]],
+    ["tracker",["prc","nat","sur"],["prc"],["nat","sur"]],
+    ["quartermaster",["ath"],["ath"],[]],
+    ["cartographer",["tools","his","sur"],["tools"],["his","sur"]],
+    ["packmaster",["ani"],["ani"],[]],
+    ["entertainer",["prf","instrument"],["prf","instrument"],[]],
+    ["rearguard",["dec","sur"],["dec"],["sur"]],
+    ["traveller",["sur"],["sur"],[]]
+  ],
+  camp:[
+    ["setcamp",["ath","str"],["ath","str"],[]],
+    ["keepwatch",["prc"],["prc"],[]],
+    ["fortify",["sur","tinkering"],["sur","tinkering"],[]],
+    ["perimeter",["prc","sur","ste"],["prc"],["sur","ste"]],
+    ["hunter",["sur","ste","nat"],["sur"],["ste","nat"]],
+    ["forage",["herbalism","nat","sur"],["herbalism"],["nat","sur"]],
+    ["leader",["per","dec","prf","itm"],["per","dec"],["prf","itm"]],
+    ["entertainer",["prf","instrument"],["prf","instrument"],[]],
+    ["cook",["cooking"],["cooking"],[]],
+    ["downtime",["downtime"],[],[]],
+    ["fullrest",[],[],[]]
+  ],
+  finder:[
+    ["scout",["prc","sur","ste"],["prc"],["sur","ste"]],
+    ["guide",["nat","his","inv","map"],["nat"],["his","inv","map"]]
+  ]
+};
+for(const [stage,expected] of Object.entries(catalogueMatrix)) {
+  const actual=rules.CATALOG[stage];
+  assert.equal(actual.length,expected.length,`${stage} role count`);
+  for(let i=0;i<expected.length;i++){
+    const [id,checks,first,second]=expected[i];
+    assert.equal(actual[i].id,id,`${stage} role ${i}`);
+    assert.deepEqual(actual[i].checks,checks,`${stage} ${id}: choice list`);
+    assert.deepEqual(rules.roleSkillGroups(actual[i]),{first,second},`${stage} ${id}: AND/OR grouping`);
+  }
+}
+// Every paired role grants ADV only when BOTH relevant groups are proficient.
+for(const [stage,id,first,second,choice,tool] of [
+  ["exploration","guide","nat","his","nat",false],
+  ["exploration","scout","prc","sur","prc",false],
+  ["exploration","navigator","navigator","sur","sur",true],
+  ["exploration","tracker","prc","nat","prc",false],
+  ["exploration","cartographer","tools","his","his",true],
+  ["exploration","rearguard","dec","sur","dec",false],
+  ["camp","perimeter","prc","sur","prc",false],
+  ["camp","hunter","sur","nat","sur",false],
+  ["camp","forage","herbalism","nat","nat",true],
+  ["camp","leader","per","itm","per",false],
+  ["finder","scout","prc","sur","prc",false],
+  ["finder","guide","nat","his","nat",false]
+]) {
+  const def=rules.CATALOG[stage].find(r=>r.id===id);
+  const actor=makeActor("pair",{[first]:1,[second]:1});
+  const positive=rules.modeFor(actor,def,choice,false,"normal",tool);
+  assert.equal(positive.advantage,true,`${stage} ${id} must grant two-skill advantage`);
+  const absent=makeActor("lone",{[first]:1});
+  assert.equal(rules.modeFor(absent,def,choice,false,"normal",tool).advantage,false,`${stage} ${id} must require BOTH skills`);
+  if(tool) assert.equal(rules.modeFor(actor,def,choice,false,"normal",false).advantage,false,`${stage} ${id} requires manual tool confirmation`);
+}
+const getRole=(stage,id)=>rules.CATALOG[stage].find(r=>r.id===id);
+const sample=makeActor("Kali",{prc:1,sur:0,ste:1});
+assert.equal(rules.modeFor(sample,getRole("exploration","scout"),"prc",false,"normal").advantage,false,
+  "Regression: Perception + ordinary Stealth at Normal pace must roll normally");
+assert.equal(rules.defaultPreview(sample,getRole("exploration","scout"),"normal").label,"Perception: Normal");
+assert.equal(rules.defaultPreview(sample,getRole("exploration","scout"),"normal").pair,"Pair 1/2");
+sample.system.skills.ste.value=2;
+assert.equal(rules.modeFor(sample,getRole("exploration","scout"),"prc",false,"normal").advantage,true,
+  "Stealth Expertise remains eligible after the pace offset");
+sample.system.skills.ste.value=0; sample.system.skills.sur.value=1;
+assert.equal(rules.modeFor(sample,getRole("exploration","scout"),"prc",false,"normal").advantage,true);
+assert.equal(rules.modeFor(sample,getRole("exploration","scout"),"prc",true,"normal").advantage,false,
+  "Second duty cancels paired advantage");
+// Single-skill and OR alternatives do NOT grant advantage for proficiency alone.
+for(const [stage,id,skill] of [
+  ["exploration","quartermaster","ath"],["exploration","packmaster","ani"],
+  ["exploration","entertainer","prf"],["exploration","traveller","sur"],
+  ["camp","setcamp","ath"],["camp","keepwatch","prc"],
+  ["camp","fortify","sur"],["camp","entertainer","prf"],
+  ["camp","cook","cooking"]
+]) assert.equal(rules.modeFor(makeActor("solo",{[skill]:2}),getRole(stage,id),skill,false,"normal").advantage,false,
+  `${stage} ${id} is NOT a paired proficiency duty`);
+// Manual map as the second Guide skill.
+const mapGuide=makeActor("mapper",{nat:1});
+assert.equal(rules.modeFor(mapGuide,getRole("exploration","guide"),"nat",false,"normal",false).advantage,false);
+assert.equal(rules.modeFor(mapGuide,getRole("exploration","guide"),"nat",false,"normal",true).advantage,true);
+// The Leader takes one social skill from EACH of two groups.
+const leader=makeActor("leader",{dec:1,itm:1});
+assert.equal(rules.modeFor(leader,getRole("camp","leader"),"dec",false,"normal").advantage,true);
+assert.equal(rules.modeFor(leader,getRole("camp","leader"),"itm",false,"normal").advantage,true);
+assert.equal(rules.modeFor(leader,getRole("camp","leader"),"per",false,"normal").advantage,false);
+assert.equal(rules.modeFor(leader,getRole("camp","leader"),"dec",true,"normal").advantage,false);
+// Fast offsets EACH ordinary skill in a pair. Slow independently grants
+// Perception/Survival ADV, including to characters with no proficiency.
+assert.equal(rules.modeFor(makeActor("fast",{prc:1,sur:1}),getRole("exploration","scout"),"prc",false,"fast").advantage,false);
+assert.equal(rules.modeFor(makeActor("slow",{}),getRole("camp","keepwatch"),"prc",false,"slow").advantage,true);
+
 assert.equal(context.pace,"normal");
 assert.equal(context.paceOptions.length,3);
 assert.equal(context.watchNames.length,4);
@@ -85,6 +187,7 @@ assert(template.includes('name="ce-pace"'));
 assert(template.includes('role reference &amp; guidance'));
 assert(template.includes("ce-pick--favoured"));
 assert(template.includes('class="ce-effect"'));
+assert(template.includes('ce-role-preview'));
 const socket=handlers['module.camp-exploration'];
 const send=async(action,payload)=>{
   socket({kind:'request',action,payload});
@@ -134,16 +237,16 @@ assert.equal(current.pace,'fast');
 // Fast pace shows the trained Ranger's Perception as amber rather than green.
 let fastCtx=await appRef._prepareContext();
 assert.equal(fastCtx.players.find(p=>p.id==='p1').watchSkill.state,'suppressed');
-assert.equal(fastCtx.players.find(p=>p.id==='p1').watchSkill.effect,'EVEN');
+assert.equal(fastCtx.players.find(p=>p.id==='p1').watchSkill.effect,'OFFSET');
 assert.equal(fastCtx.players.find(p=>p.id==='p2').watchSkill.state,'untrained');
 // Expertise retains advantage after one pace penalty.
 p1.character.system.skills.prc.value=2;
 fastCtx=await appRef._prepareContext();
 assert.equal(fastCtx.players.find(p=>p.id==='p1').watchSkill.state,'expertise');
-assert.equal(fastCtx.players.find(p=>p.id==='p1').watchSkill.effect,'ADV');
+assert.equal(fastCtx.players.find(p=>p.id==='p1').watchSkill.effect,'COUNTS');
 await appRef._roll("p1","watch",0);
 await new Promise(resolve=>setTimeout(resolve,0));
-assert.equal(rollCalls.at(-1).options.advantage,true);
+assert.equal(rollCalls.at(-1).options.advantage,false); // Watch is single-skill
 assert.equal(rollCalls.at(-1).options.disadvantage,false);
 delete current.history["1:watch:p1:0"];
 p1.character.system.skills.prc.value=1;
@@ -182,7 +285,7 @@ const slowCtx=await appRef._prepareContext();
 const slowUntrained=slowCtx.players.find(p=>p.id==='p2').watchSkill;
 assert.equal(slowUntrained.state,'favoured');
 assert.equal(slowUntrained.prefix,'×'); // keep base training visible
-assert.equal(slowUntrained.effect,'ADV');
+assert.equal(slowUntrained.effect,'PACE ADV');
 assert.equal(slowCtx.players.find(p=>p.id==='p1').exploration0.favourable,true);
 // Homebrew eligibility: Slow permits an untrained Perception user to select Scout.
 nextRoleChoice='scout';
@@ -206,12 +309,12 @@ p1.character.system.skills.ste={value:1};
 let normalCtx=await appRef._prepareContext();
 let stealthBadge=normalCtx.players.find(p=>p.id==='p1').exploration0.skills.find(x=>x.name==='Stealth');
 assert.equal(stealthBadge.state,'suppressed');
-assert.equal(stealthBadge.effect,'EVEN');
+assert.equal(stealthBadge.effect,'OFFSET');
 p1.character.system.skills.ste.value=2;
 normalCtx=await appRef._prepareContext();
 stealthBadge=normalCtx.players.find(p=>p.id==='p1').exploration0.skills.find(x=>x.name==='Stealth');
 assert.equal(stealthBadge.state,'expertise');
-assert.equal(stealthBadge.effect,'ADV');
+assert.equal(stealthBadge.effect,'COUNTS');
 p1.character.system.skills.ste.value=0;
 await send('assign',{userId:'p2',field:'camp0',value:'downtime'});
 nextCheckChoice='ste';

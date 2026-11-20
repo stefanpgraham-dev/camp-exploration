@@ -217,3 +217,15 @@
   min-width:0;
   line-height:1.4;
 }
+
+/* v0.3.3 — display actual role result, not advantage for a lone proficiency. */
+.camp-exploration .ce-role-preview {
+  display:block; color:#635744; font-size:10px; line-height:1.35;
+  font-weight:600; padding:3px 5px; border-radius:3px; white-space:normal;
+  background:#ede7dc; border:1px solid #d8cbb7;
+  overflow-wrap:anywhere;
+}
+.camp-exploration .ce-preview--advantage {color:#20582e;background:#e1f0df;border-color:#9cbe9a;}
+.camp-exploration .ce-preview--disadvantage {color:#7b3f24;background:#fae4d5;border-color:#d5a790;}
+.camp-exploration .ce-preview--normal {color:#655440;background:#f0e9dc;border-color:#d8cbb7;}
+.ce-role-preview {display:block; font-size:11px; line-height:1.4; color:#514f44; margin-top:4px;}

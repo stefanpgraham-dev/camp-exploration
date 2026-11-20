@@ -7,15 +7,28 @@ A small shared party board for a D&D 5e homebrew travel and camping procedure. D
 - Each player self-assigns a **primary Exploration** duty and **primary Campsite** duty. A second duty in either phase is optional, and adds disadvantage to both associated duty rolls. Role assignments persist between journey days.
 - Exactly two *different* players find a campsite: one **Scout** and one **Guide**, against a GM-chosen terrain DC. Two passes permit a long rest; one pass indicates a reasonable camp where the GM judges whether a long rest is possible; neither pass allows only a short rest. The **GM-only Party rest** button explicitly invokes the D&D 5e short/long rest workflow for each assigned player character after confirmation.
 - Players can opt in to **First, Second, Third, or Fourth Watch** (four two-hour slots), or take no watch. Watch checks use Perception. Multiple characters can share a watch, but one person can be assigned to only one watch.
-- **Role pickers display the character’s skills** without leaving the board: green ✓ for proficiency, blue ★ for expertise, amber ½ for half proficiency, red × for no proficiency, and grey ? where a tool/manual check cannot be automatically verified. An asterisk marks required proficiency. Unavailable options explain why they cannot be selected.
-- The GM selects a **Travel Pace** using aligned radio cards at the top of the board: **Fast +25%**, **Normal**, or **Slow −25%**. No fixed mileage is calculated. **Homebrew skill advantage:** Proficiency in the selected standard skill grants advantage; Expertise also grants advantage and protects it from one travel-pace penalty. A Fast-pace penalty on Perception, Survival or Stealth (or Normal-pace penalty on Stealth) **cancels ordinary proficiency-granted advantage**, rather than imposing disadvantage. Expertise remains at advantage; an untrained character rolls normally even when pace is Fast/Normal. Slow pace grants advantage on Perception/Survival to everyone, including untrained characters. A second duty remains an independent source of disadvantage: it cancels any remaining advantage or imposes disadvantage if there is none. Native D&D skill proficiency/Expertise bonuses remain unchanged. On the board: green `ADV`, amber `EVEN`, blue `★ ADV` for Expertise, and red `×` for untrained. Eligibility still requires the role's first-listed skill to be proficient or Expertise, except that Slow pace allows untrained Perception/Survival roles. This is a deliberate homebrew departure from D&D 2024, where proficiency does not itself confer advantage and Fast/Normal pace can impose disadvantage. Pace adjustments apply in every phase of this module, including campsites and watches. **Next Day** returns to Normal; **Reset Day** preserves the selected pace.
+- **Role pickers display each character's proficiency** using green ✓, blue ★ for Expertise, red × for untrained, amber OFFSET for a pace-penalised skill, and grey ? for unverified tool proficiency. A skill's colour shows its eligibility for the pairing; it **does not promise advantage on its own**. Each selected role also displays its default check's final mode (Normal / Advantage / Disadvantage) and the qualifying skill-group count (0/2, 1/2 or 2/2).
+- GM-controlled **Travel Pace**: Fast +25%, Normal, Slow −25%, without fixed mileage. At Fast pace, ordinary proficiency in Perception, Survival or Stealth does not count toward the **two-skill advantage pair**; at Normal pace the offset applies only to Stealth. Expertise still counts after one pace offset. Slow pace independently gives all Perception/Survival checks advantage, even for the untrained, and may temporarily permit those required skills for role assignment. Pace does **not remove proficiency bonuses** or impose disadvantage by itself under this homebrew. A separate second-duty penalty can still impose disadvantage; it cancels advantage if present. Matching pace effects extend throughout the exploration, campsite and watch checks. Next Day resets to Normal; Reset Day preserves the chosen pace.
 - Each expanded role reference shows a short **guidance description** of what its duty represents, without new rolls or automatic consequences. **Other Downtime** now offers all 18 standard skills and **N/A** on clicking Roll; choosing a skill uses the native character check, and N/A records completion without rolling.
 - Journey duties are rolled once per duty per day. D&D 5e's native skill-check API handles regular skills, allowing normal character bonuses and integrations. Natural 1/20 on the kept die posts a narrative prompt, with **no automated mechanical effect**.
-- Advantage on the selected standard skill check comes from proficiency in that skill (one level) or Expertise (protected level). The old paired-skill proficiency condition is no longer needed for advantage. Multiple advantages do not result in extra dice. Travel-pace penalties cancel one advantage tier, then the second-duty penalty applies separately. Manual tool checks continue to use the provided modifier and are not assumed proficient.
+- **Paired proficiency advantage:** Roles with two-part requirements need **the required first skill (or first-group alternative) AND one complementary second skill**, both qualifying for today's pace. Only then does a check from one of those qualified skill groups gain advantage. Selecting an untrained alternative does not inherit another skill's proficiency. A single-skill role or a role with **OR** alternatives does not gain automatic advantage merely from proficiency. For tool-based pairs (Navigator, Cartographer, Forage or a Map alternative), players explicitly confirm the relevant tool proficiency in the check dialog to enable the bonus. This avoids assuming tool proficiency from unknown Foundry field layouts.
 - A daily **supply die** roll reduces the current die on 1 or 2: d12 → d10 → d8 → d6 → d4 → depleted. GM resupply sets the die to d8 (party), d10 (pack animals), or d12 (wagons).
 - The image's **Chaos Factor** starts at 3 and can be adjusted by the GM; it does not itself trigger events.
 - GM-only **Party rest** applies a short/long rest to each unique player-assigned D&D 5e character. Short rests open each actor’s native rest/Hit Dice dialog; long rests run the system workflow automatically. A rest does **not** advance/reset the journey day.
 - GM-only **Reset day** clears the current day’s exploration, camp, finder and watch assignments, rolls and campsite result, and **unlocks Check Supply** for a new roll, preserving the selected pace for that day. The day number, current depleted supply die, chaos factor and character resources remain unchanged. **Next day** advances the number, clears results but retains role assignments.
+
+
+### Role catalogue / AND–OR rules
+
+The following role groups were audited against the supplied rules reference:
+
+| Phase | Two-part advantage pairs | One-skill or alternative duties |
+|---|---|---|
+| Exploration | Guide: Nature + (History / Investigation / Map); Scout: Perception + (Survival / Stealth); Navigator: Navigator's Tools + Survival; Tracker: Perception + (Nature / Survival); Cartographer: Tools + (History / Survival); Rear Guard: Deception + Survival | Quartermaster: Athletics; Packmaster: Animal Handling; Entertainer: Performance **or** Instrument; Traveller: Survival |
+| Campsite | Scout Perimeter: Perception + (Survival / Stealth); Hunter: Survival + (Stealth / Nature); Forage: Herbalism + (Nature / Survival); Leader: (Persuasion / Deception) + (Performance / Intimidation) | Set Camp: Athletics **or** Strength; Keep Watch: Perception; Fortify Camp: Survival **or** Tinkering; Entertainer: Performance **or** Instrument; Cook: Cook's Utensils; Other Downtime: any skill / N/A; Full Rest: no roll |
+| Find Campsite | Scout and Guide use the same corresponding two-part requirements as Exploration | Two different volunteers are required |
+
+The Leader's paired alternatives are interpreted as two groups based on the conjunction in the supplied sheet. Tool checks have explicit confirmation for proficiency-based paired advantage. This module never adds new mandatory rolls to resolve these duties.
 
 ## Installation
 
@@ -32,7 +45,7 @@ A small shared party board for a D&D 5e homebrew travel and camping procedure. D
 
 ### GitHub release / manifest URL
 
-Publish this source as the root of a new GitHub repository. On your GitHub repo's **Settings → Actions → General**, allow workflows to read and write contents if needed. Pushing a version change on the `main` branch automatically runs tests and publishes `module.json` and `camp-exploration.zip` as a GitHub release with the tag matching `module.json` (e.g. `v0.3.2`).
+Publish this source as the root of a new GitHub repository. On your GitHub repo's **Settings → Actions → General**, allow workflows to read and write contents if needed. Pushing a version change on the `main` branch automatically runs tests and publishes `module.json` and `camp-exploration.zip` as a GitHub release with the tag matching `module.json` (e.g. `v0.3.3`).
 
 **Then use this URL in Foundry's Install Module → Manifest URL:**
 
@@ -45,7 +58,7 @@ The generated release manifest contains the correct `manifest` and `download` li
 To build without GitHub Actions:
 
 ```bash
-python tools/package.py --repo stefanpgraham-dev/camp-exploration --version 0.3.2
+python tools/package.py --repo stefanpgraham-dev/camp-exploration --version 0.3.3
 ```
 
 Upload both files from `dist/` as assets on the same GitHub release.
@@ -71,4 +84,4 @@ Upload both files from `dist/` as assets on the same GitHub release.
 
 ## Developer notes
 
-Source module id: `camp-exploration`. No external dependencies. Version `0.3.2`.
+Source module id: `camp-exploration`. No external dependencies. Version `0.3.3`.

@@ -18,33 +18,33 @@ const OTHER = {
 };
 const CATALOG = {
   exploration: [
-    {id:"guide", name:"Guide", required:"nat", checks:["nat","his","inv","map"], pair:["his","inv"], note:"Nature & History or Investigation; map allowed"},
+    {id:"guide", name:"Guide", required:"nat", checks:["nat","his","inv","map"], pair:["his","inv","map"], note:"Nature plus History or Investigation; map as a manual alternative"},
     {id:"scout", name:"Scout", required:"prc", checks:["prc","sur","ste"], pair:["sur","ste"], note:"Perception & Survival or Stealth"},
     {id:"navigator", name:"Navigator", required:"navigator", checks:["navigator","sur"], pair:["sur"], note:"Navigator's tools & Survival"},
     {id:"tracker", name:"Tracker", required:"prc", checks:["prc","nat","sur"], pair:["nat","sur"], note:"Perception & Nature or Survival"},
     {id:"quartermaster", name:"Quartermaster", required:"ath", checks:["ath"], note:"Athletics"},
     {id:"cartographer", name:"Cartographer", required:"tools", checks:["tools","his","sur"], pair:["his","sur"], note:"Tools & History or Survival"},
     {id:"packmaster", name:"Packmaster", required:"ani", checks:["ani"], note:"Animal Handling"},
-    {id:"entertainer", name:"Entertainer", required:"prf", checks:["prf","instrument"], pair:["instrument"], note:"Performance or musical instrument"},
+    {id:"entertainer", name:"Entertainer", requiredAny:["prf","instrument"], checks:["prf","instrument"], note:"Performance OR musical instrument (one skill, not a pair)"},
     {id:"rearguard", name:"Rear Guard", required:"dec", checks:["dec","sur"], pair:["sur"], note:"Deception & Survival"},
     {id:"traveller", name:"Traveller", required:"sur", checks:["sur"], note:"Survival"}
   ],
   camp: [
-    {id:"setcamp", name:"Set Camp", checks:["ath","str"], note:"Athletics or Strength"},
+    {id:"setcamp", name:"Set Camp", requiredAny:["ath","str"], checks:["ath","str"], note:"Athletics OR Strength (one check)"},
     {id:"keepwatch", name:"Keep Watch", required:"prc", checks:["prc"], note:"Perception"},
-    {id:"fortify", name:"Fortify Camp", required:"sur", checks:["sur","tinkering"], note:"Survival or Tinkering"},
+    {id:"fortify", name:"Fortify Camp", requiredAny:["sur","tinkering"], checks:["sur","tinkering"], note:"Survival OR Tinkering (one skill, not a pair)"},
     {id:"perimeter", name:"Scout Perimeter", required:"prc", checks:["prc","sur","ste"], pair:["sur","ste"], note:"Perception & Survival or Stealth"},
     {id:"hunter", name:"Hunter or Trapper", required:"sur", checks:["sur","ste","nat"], pair:["ste","nat"], note:"Survival & Stealth or Nature"},
     {id:"forage", name:"Forage", required:"herbalism", checks:["herbalism","nat","sur"], pair:["nat","sur"], note:"Herbalism & Nature or Survival"},
-    {id:"leader", name:"Leader", checks:["per","dec","prf","itm"], note:"Persuasion, Deception, Performance or Intimidation"},
-    {id:"entertainer", name:"Entertainer", checks:["prf","instrument"], note:"Performance or musical instrument"},
+    {id:"leader", name:"Leader", requiredAny:["per","dec"], checks:["per","dec","prf","itm"], pair:["prf","itm"], note:"(Persuasion or Deception) AND (Performance or Intimidation)"},
+    {id:"entertainer", name:"Entertainer", requiredAny:["prf","instrument"], checks:["prf","instrument"], note:"Performance OR musical instrument (one check)"},
     {id:"cook", name:"Cook", required:"cooking", checks:["cooking"], note:"Cook's utensils"},
     {id:"downtime", name:"Other Downtime", checks:["downtime"], note:"Varies; choose your own check"},
     {id:"fullrest", name:"Full Rest", checks:[], note:"No roll"}
   ],
   finder: [
-    {id:"scout", name:"Campsite Scout", required:"prc", checks:["prc","sur","ste"], pair:["sur","ste"], note:"Perception & Survival or Stealth"},
-    {id:"guide", name:"Campsite Guide", required:"nat", checks:["nat","his","inv","map"], pair:["his","inv"], note:"Nature & History or Investigation; map allowed"}
+    {id:"scout", name:"Campsite Scout", required:"prc", checks:["prc","sur","ste"], pair:["sur","ste"], note:"Perception plus Survival or Stealth"},
+    {id:"guide", name:"Campsite Guide", required:"nat", checks:["nat","his","inv","map"], pair:["his","inv","map"], note:"Nature plus History or Investigation; map as a manual alternative"}
   ]
 };
 const DC_LABELS = [
@@ -71,7 +71,7 @@ const PACES = [
 // Descriptive, non-automated suggestions: roles retain one check and no rewards/penalties.
 const ROLE_GUIDANCE = {
   exploration:{
-    guide:"Choose an efficient route; identify safe landmarks and potential obstacles.",
+    guide:"Choose an efficient route; identify safe landmarks and potential obstacles. Nature + History/Investigation (or Map).",
     scout:"Look ahead for threats, tracks and concealed routes before the party arrives.",
     navigator:"Keep bearings, compare terrain with the map and avoid drifting off course.",
     tracker:"Identify creatures or travellers who passed through and estimate their direction.",
@@ -93,7 +93,7 @@ const ROLE_GUIDANCE = {
     perimeter:"Inspect nearby ground, approaches and traces of potential visitors.",
     hunter:"Seek game or set simple traps; the GM decides what resources are available.",
     forage:"Look for safe plants, herbs or water; the GM adjudicates any useful finds.",
-    leader:"Coordinate duties, settle disputes and keep the camp functioning.",
+    leader:"Coordinate duties, settle disputes and keep the camp functioning. Requires a social check from each group: Persuasion/Deception and Performance/Intimidation for paired advantage.",
     entertainer:"Tell stories, play music or improve the evening’s atmosphere.",
     cook:"Prepare and distribute meals using what the party already has.",
     downtime:"Describe the activity, select any applicable skill, or mark N/A without rolling.",
@@ -147,18 +147,63 @@ function proficiencyAdvantageTier(actor, skill, pace="normal") {
   if (effect === "disadvantage") tier=Math.max(0,tier-1);
   return tier;
 }
-function eligible(userId, roleDef, pace="normal") {
-  if (!roleDef?.required || !SKILLS[roleDef.required]) return true;
-  return effectiveQualification(actorFor(userId),roleDef.required,pace);
+function roleSkillGroups(roleDef) {
+  return {
+    first: roleDef?.requiredAny || (roleDef?.required ? [roleDef.required] : []),
+    second: roleDef?.pair || []
+  };
 }
-function modeFor(actor, roleDef, choice, overloaded, pace="normal") {
-  // Unlike RAW travel pace, pace penalties only consume the advantage
-  // contributed by proficiency; they never impose disadvantage alone.
-  // Expertise has two suitability tiers, which yields ordinary (single)
-  // advantage even after one pace penalty.
-  const hasAdv=proficiencyAdvantageTier(actor,choice,pace)>0;
-  // Taking a second duty retains its existing independent disadvantage.
+function skillCounts(actor,skill,pace="normal",confirmedTool=false) {
+  if (SKILLS[skill]) return proficiencyAdvantageTier(actor,skill,pace)>0;
+  // Tool/map proficiencies are not consistently accessible across D&D 5e
+  // versions. Let players confirm them explicitly in the check dialog.
+  return !!confirmedTool && ["navigator","tools","herbalism","map"].includes(skill);
+}
+function eligible(userId,roleDef,pace="normal") {
+  const {first}=roleSkillGroups(roleDef);
+  if (!first.length) return true;
+  const actor=actorFor(userId);
+  if (!actor) return false;
+  // Manual/unverified tools can satisfy alternative or first-listed tools.
+  return first.some(skill=>!SKILLS[skill] || effectiveQualification(actor,skill,pace));
+}
+function pairedAdvantage(actor,roleDef,choice,pace="normal",confirmedTool=false) {
+  const {first,second}=roleSkillGroups(roleDef);
+  if (!first.length || !second.length) return false;
+  const selectedFirst=first.includes(choice),selectedSecond=second.includes(choice);
+  if (!selectedFirst && !selectedSecond) return false;
+  const qualifiedFirst=(selectedFirst ? [choice] : first)
+    .some(skill=>skillCounts(actor,skill,pace,confirmedTool));
+  const qualifiedSecond=(selectedSecond ? [choice] : second)
+    .some(skill=>skillCounts(actor,skill,pace,confirmedTool));
+  // Two independent qualifying skills: one from each group.
+  return qualifiedFirst && qualifiedSecond;
+}
+function modeFor(actor,roleDef,choice,overloaded,pace="normal",confirmedTool=false) {
+  const paired=pairedAdvantage(actor,roleDef,choice,pace,confirmedTool);
+  // Slow pace grants a separate advantage on Perception/Survival, even
+  // without the normal two-skill pair or any base proficiency.
+  const slow=paceEffect(choice,pace)==="advantage";
+  const hasAdv=paired || slow;
   return {advantage:hasAdv && !overloaded,disadvantage:overloaded && !hasAdv};
+}
+function rollModeLabel(mode) {
+  return mode.advantage ? "Advantage" : mode.disadvantage ? "Disadvantage" : "Normal";
+}
+function defaultPreview(actor,def,pace="normal",overloaded=false) {
+  const check=def?.checks?.[0];
+  if (!check || check==="downtime") return null;
+  const mode=modeFor(actor,def,check,overloaded,pace);
+  const {first,second}=roleSkillGroups(def);
+  const pair=second.length>0;
+  const firstCount=first.some(c=>skillCounts(actor,c,pace));
+  const secondCount=second.some(c=>skillCounts(actor,c,pace));
+  const unverified=pair && [...first,...second].some(c=>!SKILLS[c]);
+  return {
+    label:`${SKILLS[check] || OTHER[check] || check}: ${rollModeLabel(mode)}`,
+    state:mode.advantage?"advantage":mode.disadvantage?"disadvantage":"normal",
+    pair:pair?`Pair ${Number(firstCount)+Number(secondCount)}/2${unverified?" · verify tool at roll":""}`:""
+  };
 }
 function normalizedRoll(maybe) {
   if (Array.isArray(maybe)) return maybe.map(normalizedRoll).find(Boolean);
@@ -178,7 +223,7 @@ function naturalFrom(roll) {
 function skillBadges(actor, roleDef, pace="normal") {
   return (roleDef?.checks || []).map(code => {
     const name = SKILLS[code] || OTHER[code] || code;
-    const mandatory = roleDef.required === code && !!SKILLS[code];
+    const mandatory = roleSkillGroups(roleDef).first.includes(code);
     let state = "unknown", prefix = "?", explanation = "Check character sheet";
     let effect = "";
     if (SKILLS[code] && actor) {
@@ -191,20 +236,19 @@ function skillBadges(actor, roleDef, pace="normal") {
       const impact=paceEffect(code,pace);
       if (impact === "advantage") {
         state = "favoured";
-        effect = "ADV";
-        explanation = `${training}; Slow pace grants advantage to the skill roll (homebrew). Base proficiency bonus is unchanged.`;
+        effect = "PACE ADV";
+        explanation = `${training}; Slow pace independently grants advantage on this check and counts toward paired skill requirements.`;
       } else if (impact === "disadvantage") {
-        const stillAdv=proficiencyAdvantageTier(actor,code,pace)>0;
-        effect = stillAdv ? "ADV" : rank >= 1 ? "EVEN" : "";
+        const qualifies=proficiencyAdvantageTier(actor,code,pace)>0;
+        effect = rank >= 1 ? qualifies ? "COUNTS" : "OFFSET" : "";
         state = rank >= 2 ? "expertise" : rank >= 1 ? "suppressed" : "untrained";
         explanation = rank >= 2
-          ? "Expertise retains advantage after the pace penalty (homebrew). Expertise bonus is unchanged."
+          ? "Expertise still counts toward the two-skill requirement after one pace penalty. It does not grant role advantage without the required complementary skill."
           : rank >= 1
-            ? "Pace penalty cancels proficiency-granted advantage: roll normally, keeping proficiency (homebrew)."
-            : "Untrained: pace penalty cannot impose disadvantage on its own; roll normally.";
+            ? "Pace offsets this ordinary proficiency for the two-skill advantage requirement; proficiency bonus remains on the roll."
+            : "Untrained; the pace penalty does not impose disadvantage by itself.";
       } else {
-        if (rank >= 1) effect="ADV";
-        explanation = `${training}; ${rank >= 1 ? "advantage from proficiency (homebrew)" : "normal roll"}.`;
+        explanation = `${training}; ${rank >= 1 ? "counts toward a two-skill requirement, but does not grant advantage alone" : "does not count toward the skill pair"}.`;
       }
     } else if (code === "str") {
       state = "ability"; prefix = "–"; explanation = "Ability check; no skill proficiency needed";
@@ -212,13 +256,14 @@ function skillBadges(actor, roleDef, pace="normal") {
     return {name, state, prefix, mandatory, explanation, effect};
   });
 }
-function roleDisplay(stage, key, actor, placeholder, pace="normal") {
-  const def = role(stage, key);
+function roleDisplay(stage, key, actor, placeholder, pace="normal", overloaded=false) {
+  const def=role(stage,key);
   const skills=skillBadges(actor,def,pace);
   return {
-    name: def?.name || placeholder, empty: !def, skills,
-    favourable:skills.some(s=>s.state === "favoured"),
-    penalized:skills.some(s=>s.state === "suppressed")
+    name:def?.name || placeholder, empty:!def, skills,
+    favourable:skills.some(s=>s.state==="favoured"),
+    penalized:skills.some(s=>s.state==="suppressed"),
+    preview:defaultPreview(actor,def,pace,overloaded)
   };
 }
 // Skill chips appear both in selected-role buttons and alongside every option in the picker.
@@ -427,7 +472,9 @@ class CampBoard extends HandlebarsApplicationMixin(ApplicationV2) {
       const a=assignment(state,user.id), actor=actorFor(user.id);
       const editable=game.user.isGM || game.user.id === user.id;
       const hist=(stage,slot)=>state.history[`${state.day}:${stage}:${user.id}:${slot}`];
-      const choices=(stage,idx)=>roleDisplay(stage,a[stage]?.[idx] || "",actor,idx ? "— No second duty —" : "— Choose a role —",state.pace);
+      const choices=(stage,idx)=>roleDisplay(stage,a[stage]?.[idx] || "",actor,
+        idx ? "— No second duty —" : "— Choose a role —",state.pace,
+        (a[stage]||[]).filter(Boolean).length > 1);
       const rolled0=hist("exploration",0),rolled1=hist("exploration",1),rolledC0=hist("camp",0),rolledC1=hist("camp",1);
       return {
         id:user.id,name:user.name,active:user.active,actorName:actor?.name || "No assigned character",
@@ -535,11 +582,14 @@ class CampBoard extends HandlebarsApplicationMixin(ApplicationV2) {
         <input type="radio" name="role" value="${def.id}" ${def.id === selected ? "checked" : ""} ${blocked ? "disabled" : ""}/>
         <span class="ce-role-option-body"><span class="ce-role-option-head"><strong>${foundry.utils.escapeHTML(def.name)}</strong>${reason ? `<em>${reason}</em>` : ""}</span>
         ${def.note ? `<span class="ce-role-note">${foundry.utils.escapeHTML(def.note)}</span>` : ""}
-        <span class="ce-skill-row">${skillBadgesHTML(actor,def,state.pace)}</span></span>
+        <span class="ce-skill-row">${skillBadgesHTML(actor,def,state.pace)}</span>
+        ${defaultPreview(actor,def,state.pace,stage!=="finder" && (a[stage]||[]).filter(Boolean).length>0)?.label
+          ? `<small class="ce-role-preview">${foundry.utils.escapeHTML(defaultPreview(actor,def,state.pace,stage!=="finder" && (a[stage]||[]).filter(Boolean).length>0).label)} · ${foundry.utils.escapeHTML(defaultPreview(actor,def,state.pace,stage!=="finder" && (a[stage]||[]).filter(Boolean).length>0).pair)}</small>`
+          : ""}</span>
       </label>`;
     }).join("");
     const result=await DialogV2.input({window:{title:`Choose ${stage === "finder" ? "campsite finder" : stage} role — ${name}`},
-      content:`<div class="ce-role-dialog"><p>Skills for <strong>${foundry.utils.escapeHTML(actor?.name || "an unassigned character")}</strong> · <strong>${foundry.utils.escapeHTML(state.pace.toUpperCase())}</strong> pace.<br/><span class="ce-skill ce-skill--favoured">▲ ADV · Slow pace</span> <span class="ce-skill ce-skill--suppressed">✓ EVEN · pace offset</span> <span class="ce-skill ce-skill--expertise">★ ADV · Expertise</span> <span class="ce-skill ce-skill--proficient">✓ ADV · Proficient</span> <span class="ce-skill ce-skill--untrained">× Untrained</span><br/><small>* Required skill. Pace penalty cancels one proficiency advantage tier but cannot impose disadvantage by itself. Expertise retains advantage. D&D skill bonuses remain intact; second-duty disadvantage still applies. Tools may need manual verification.</small></p><div class="ce-role-choices">${rows}</div></div>`,
+      content:`<div class="ce-role-dialog"><p>Skills for <strong>${foundry.utils.escapeHTML(actor?.name || "an unassigned character")}</strong> · <strong>${foundry.utils.escapeHTML(state.pace.toUpperCase())}</strong> pace.<br/><span class="ce-skill ce-skill--proficient">✓ Qualifies</span> <span class="ce-skill ce-skill--suppressed">✓ OFFSET · does not count</span> <span class="ce-skill ce-skill--expertise">★ COUNTS · Expertise</span> <span class="ce-skill ce-skill--favoured">▲ PACE ADV · Slow</span><br/><small>* Required skill. Paired-role advantage needs the mandatory skill AND one complementary qualifying skill. The displayed default check preview is updated for today's pace. Proficiency bonuses remain unchanged; a second duty is a separate penalty.</small></p><div class="ce-role-choices">${rows}</div></div>`,
       ok:{label:"Assign role"}});
     if (!result || typeof result.role !== "string") return;
     if (result.role === selected) return;
@@ -596,12 +646,23 @@ class CampBoard extends HandlebarsApplicationMixin(ApplicationV2) {
     const overloaded=(stage==="exploration" || stage==="camp") && (a[stage]||[]).filter(Boolean).length > 1;
     const checks=stage === "camp" && roleDef.id === "downtime"
       ? ["na",...Object.keys(SKILLS)] : roleDef.checks;
-    let check=checks[0];
+    let check=checks[0],manualToolProficient=false;
     if (checks.length > 1) {
-      const optionsHtml=checks.map(c=>`<option value="${c}">${foundry.utils.escapeHTML(SKILLS[c] || OTHER[c] || c)}</option>`).join("");
-      const choice=await DialogV2.input({window:{title:`${roleDef.name} — choose check`},content:`<p>${foundry.utils.escapeHTML(roleDef.note || "")}</p><div class="form-group"><label>Roll using</label><select name="choice">${optionsHtml}</select></div>`,ok:{label:"Continue"}});
+      const optionsHtml=checks.map(c=>{
+        const label=SKILLS[c] || OTHER[c] || c;
+        const mode=c==="na" ? null : modeFor(actor,roleDef,c,overloaded,state.pace);
+        return `<option value="${c}">${foundry.utils.escapeHTML(label)}${mode ? ` — ${rollModeLabel(mode)}` : ""}</option>`;
+      }).join("");
+      const {first,second}=roleSkillGroups(roleDef);
+      const manualGroup=[...first,...second].some(c=>["navigator","tools","herbalism","map"].includes(c));
+      const toolOption=manualGroup
+        ? '<div class="form-group"><label><input type="checkbox" name="toolProficient" value="true"> Confirm proficiency with the relevant tools or map</label><small>Tick only if proficient; tool proficiency is not verified automatically.</small></div>'
+        : "";
+      const choice=await DialogV2.input({window:{title:`${roleDef.name} — choose check`},
+        content:`<p>${foundry.utils.escapeHTML(roleDef.note || "")}</p><div class="form-group"><label>Roll using</label><select name="choice">${optionsHtml}</select></div>${toolOption}`,ok:{label:"Continue"}});
       if (!choice?.choice) return;
       check=choice.choice;
+      manualToolProficient=choice.toolProficient===true || choice.toolProficient==="true" || choice.toolProficient==="on";
     }
     // N/A downtime deliberately avoids skill/modifier dialogs and dice rolls.
     if (stage === "camp" && roleDef.id === "downtime" && check === "na") {
@@ -609,8 +670,9 @@ class CampBoard extends HandlebarsApplicationMixin(ApplicationV2) {
       await send("recordRoll",{userId,stage,slot,role:key,day,na:true});
       return;
     }
-    const mode=modeFor(actor,roleDef,check,overloaded,state.pace);
-    // When both proficiency bonus and double duty apply, checks are normal.
+    const mode=modeFor(actor,roleDef,check,overloaded,state.pace,manualToolProficient);
+    // Role advantage requires the mandatory skill and a qualifying paired
+    // skill; the pace can suppress the second skill even if proficient.
     let result;
     try {
       if (SKILLS[check] && typeof actor.rollSkill === "function") {
@@ -677,3 +739,6 @@ function addLauncher(html) {
   const footer=root.querySelector(".chat-form, #chat-form, .chat-controls, .chat-input")||root;
   footer.insertAdjacentElement("beforebegin",button);
 }
+
+// Export pure role-rule helpers for regression tests and future maintenance.
+export {CATALOG,roleSkillGroups,modeFor,pairedAdvantage,defaultPreview,skillBadges,eligible};
