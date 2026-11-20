@@ -1,0 +1,25 @@
+name: Publish Foundry release
+on:
+  push:
+    tags:
+      - 'v*'
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run smoke tests
+        run: node tests/smoke.mjs
+      - name: Build ZIP and manifest
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          python3 tools/package.py --repo "$GITHUB_REPOSITORY" --version "$VERSION"
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/module.json
+            dist/camp-exploration.zip
+          generate_release_notes: true
