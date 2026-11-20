@@ -188,6 +188,9 @@ assert(template.includes('role reference &amp; guidance'));
 assert(template.includes("ce-pick--favoured"));
 assert(template.includes('class="ce-effect"'));
 assert(template.includes('ce-role-preview'));
+const roleSource=(await import("node:fs")).readFileSync(new URL("../scripts/camp-exploration.mjs",import.meta.url),"utf8");
+assert(roleSource.includes('class="ce-role-legend"'),"role picker should group legend chips into a wrapping container");
+assert(roleSource.includes('class="ce-role-help"'),"long role help must occupy its own wrapping block");
 const socket=handlers['module.camp-exploration'];
 const send=async(action,payload)=>{
   socket({kind:'request',action,payload});
@@ -392,6 +395,11 @@ const css=(await import("node:fs")).readFileSync(new URL("../styles/camp-explora
 assert(css.includes(".ce-scroll button.ce-pick") && css.includes("height:auto !important"));
 assert(css.includes(".ce-pace-choice::before") && css.includes('input[type="radio"]'));
 assert(css.includes("opacity:0") && css.includes("align-self:center"));
+assert(css.includes(".ce-role-dialog .ce-role-legend"),"dialog legend must have an explicit wrapping layout");
+assert(css.includes("flex-flow:row wrap"),"legend rows must wrap");
+assert(css.includes("min-width:0; max-width:100%"),"dialog must not force the Foundry window wider");
+assert(!css.includes("min-width:min(540px,70vw)"),"old forced dialog min width causes horizontal clipping");
+assert(css.includes("overflow-x:hidden"),"choices should not create horizontal overflow");
 // Socket requests from players must not be able to reset the board.
 await send('resetDay',{userId:'p1',fromGM:true});
 assert.deepEqual(current.assignments,{});

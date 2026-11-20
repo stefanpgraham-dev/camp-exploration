@@ -30,7 +30,7 @@ The following role groups were audited against the supplied rules reference:
 
 The Leader's paired alternatives are interpreted as two groups based on the conjunction in the supplied sheet. Tool checks have explicit confirmation for proficiency-based paired advantage. This module never adds new mandatory rolls to resolve these duties.
 
-## Installation
+- **Role-selection dialog layout:** the proficiency key is placed in a responsive wrapping row, with the rule explanation below it. Neither the legend nor long role labels should force a narrow Foundry dialog to overflow horizontally.\n\n## Installation
 
 ### Install ZIP locally
 
@@ -45,7 +45,7 @@ The Leader's paired alternatives are interpreted as two groups based on the conj
 
 ### GitHub release / manifest URL
 
-Publish this source as the root of a new GitHub repository. On your GitHub repo's **Settings → Actions → General**, allow workflows to read and write contents if needed. Pushing a version change on the `main` branch automatically runs tests and publishes `module.json` and `camp-exploration.zip` as a GitHub release with the tag matching `module.json` (e.g. `v0.3.3`).
+Publish this source as the root of a new GitHub repository. On your GitHub repo's **Settings → Actions → General**, allow workflows to read and write contents if needed. Pushing a version change on the `main` branch automatically runs tests and publishes `module.json` and `camp-exploration.zip` as a GitHub release with the tag matching `module.json` (e.g. `v0.3.4`).
 
 **Then use this URL in Foundry's Install Module → Manifest URL:**
 
@@ -58,7 +58,7 @@ The generated release manifest contains the correct `manifest` and `download` li
 To build without GitHub Actions:
 
 ```bash
-python tools/package.py --repo stefanpgraham-dev/camp-exploration --version 0.3.3
+python tools/package.py --repo stefanpgraham-dev/camp-exploration --version 0.3.4
 ```
 
 Upload both files from `dist/` as assets on the same GitHub release.
@@ -84,4 +84,4 @@ Upload both files from `dist/` as assets on the same GitHub release.
 
 ## Developer notes
 
-Source module id: `camp-exploration`. No external dependencies. Version `0.3.3`.
+Source module id: `camp-exploration`. No external dependencies. Version `0.3.4`.

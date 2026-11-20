@@ -68,7 +68,7 @@
 .ce-skill--ability { color:#5b491c; background:#f8edc9; border-color:#cab677; }
 .ce-skill b { font-size:12px; margin-left:1px; }
 /* DialogV2 renders outside the board application; these must not be board-scoped. */
-.ce-role-dialog { font-size:13px; min-width:min(540px,70vw); }
+.ce-role-dialog { font-size:13px; box-sizing:border-box; width:100%; min-width:0; max-width:100%; overflow-wrap:anywhere; }
 .ce-role-dialog p { margin:0 0 10px; line-height:1.7; }
 .ce-role-choices { max-height:min(58vh,530px); overflow:auto; border:1px solid var(--color-border-light-2,#9b8e79); border-radius:6px; }
 .ce-role-option { display:flex; gap:10px; align-items:flex-start; padding:9px 11px; border-bottom:1px solid #beb5a4; cursor:pointer; }
@@ -229,3 +229,60 @@
 .camp-exploration .ce-preview--disadvantage {color:#7b3f24;background:#fae4d5;border-color:#d5a790;}
 .camp-exploration .ce-preview--normal {color:#655440;background:#f0e9dc;border-color:#d8cbb7;}
 .ce-role-preview {display:block; font-size:11px; line-height:1.4; color:#514f44; margin-top:4px;}
+
+/* v0.3.4: wrap role-picker legend and controls within narrow Foundry dialogs. */
+.ce-role-dialog .ce-role-intro { margin:0 0 7px; white-space:normal; }
+.ce-role-dialog .ce-role-legend {
+  display:flex;
+  flex-flow:row wrap;
+  align-items:flex-start;
+  align-content:flex-start;
+  justify-content:flex-start;
+  gap:5px;
+  box-sizing:border-box;
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  margin:0 0 9px;
+  white-space:normal;
+}
+.ce-role-dialog .ce-role-legend .ce-skill {
+  box-sizing:border-box;
+  flex:0 1 auto;
+  max-width:100%;
+  min-width:0;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  vertical-align:top;
+}
+.ce-role-dialog .ce-role-help {
+  display:block;
+  margin:0 0 10px;
+  max-width:100%;
+  min-width:0;
+  font-size:11px;
+  line-height:1.45;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+.ce-role-dialog .ce-role-choices {
+  box-sizing:border-box;
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  overflow-x:hidden;
+  overflow-y:auto;
+}
+.ce-role-dialog .ce-role-option { box-sizing:border-box; width:100%; min-width:0; }
+.ce-role-dialog .ce-role-option-body { box-sizing:border-box; flex:1 1 auto; min-width:0; max-width:100%; }
+.ce-role-dialog .ce-role-option-head { min-width:0; max-width:100%; overflow-wrap:anywhere; }
+.ce-role-dialog .ce-role-option .ce-skill-row {
+  display:flex;
+  flex-flow:row wrap;
+  min-width:0;
+  width:100%;
+  max-width:100%;
+  gap:4px;
+}
+.ce-role-dialog .ce-role-option .ce-skill { max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+.ce-role-dialog .ce-role-option .ce-role-preview { white-space:normal; overflow-wrap:anywhere; }

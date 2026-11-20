@@ -589,7 +589,17 @@ class CampBoard extends HandlebarsApplicationMixin(ApplicationV2) {
       </label>`;
     }).join("");
     const result=await DialogV2.input({window:{title:`Choose ${stage === "finder" ? "campsite finder" : stage} role — ${name}`},
-      content:`<div class="ce-role-dialog"><p>Skills for <strong>${foundry.utils.escapeHTML(actor?.name || "an unassigned character")}</strong> · <strong>${foundry.utils.escapeHTML(state.pace.toUpperCase())}</strong> pace.<br/><span class="ce-skill ce-skill--proficient">✓ Qualifies</span> <span class="ce-skill ce-skill--suppressed">✓ OFFSET · does not count</span> <span class="ce-skill ce-skill--expertise">★ COUNTS · Expertise</span> <span class="ce-skill ce-skill--favoured">▲ PACE ADV · Slow</span><br/><small>* Required skill. Paired-role advantage needs the mandatory skill AND one complementary qualifying skill. The displayed default check preview is updated for today's pace. Proficiency bonuses remain unchanged; a second duty is a separate penalty.</small></p><div class="ce-role-choices">${rows}</div></div>`,
+      content:`<div class="ce-role-dialog">
+        <p class="ce-role-intro">Skills for <strong>${foundry.utils.escapeHTML(actor?.name || "an unassigned character")}</strong> · <strong>${foundry.utils.escapeHTML(state.pace.toUpperCase())}</strong> pace.</p>
+        <div class="ce-role-legend" aria-label="Skill suitability legend">
+          <span class="ce-skill ce-skill--proficient">✓ Qualifies</span>
+          <span class="ce-skill ce-skill--suppressed">✓ OFFSET · does not count</span>
+          <span class="ce-skill ce-skill--expertise">★ COUNTS · Expertise</span>
+          <span class="ce-skill ce-skill--favoured">▲ PACE ADV · Slow</span>
+        </div>
+        <p class="ce-role-help">* Required skill. Paired-role advantage needs the mandatory skill AND one complementary qualifying skill. The displayed default check preview is updated for today's pace. Proficiency bonuses remain unchanged; a second duty is a separate penalty.</p>
+        <div class="ce-role-choices">${rows}</div>
+      </div>`,
       ok:{label:"Assign role"}});
     if (!result || typeof result.role !== "string") return;
     if (result.role === selected) return;
