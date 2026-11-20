@@ -48,3 +48,39 @@
 .camp-exploration .ce-reference-grid {display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:5px 13px;margin-top:8px;}
 .camp-exploration .ce-reference-grid p {font-size:11px;display:flex;flex-direction:column;margin:0;padding:5px;border-radius:4px;background:#f3ecd9;}
 .camp-exploration .ce-reference-grid span {color:#655642;}
+
+/* v0.2.0 — role selection, proficiency visibility and GM controls */
+.camp-exploration .ce-gm-actions { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+.camp-exploration .ce-gm-actions button { font-size:12px; }
+.camp-exploration .ce-reset-day { background:#765b48; }
+.camp-exploration .ce-pick { display:block; width:100%; min-width:175px; text-align:left; border:1px solid #bda986; background:#fffaf0; color:#3d3323; padding:7px 8px; white-space:normal; cursor:pointer; }
+.camp-exploration .ce-pick:hover:not(:disabled) { background:#eee0c6; color:#32251a; }
+.camp-exploration .ce-pick:disabled { opacity:.66; cursor:not-allowed; }
+.camp-exploration .ce-pick-title { font-size:12px; font-weight:700; display:flex; align-items:center; gap:9px; justify-content:space-between; }
+.camp-exploration .ce-pick-title i { opacity:.65; }
+.camp-exploration .ce-pick .ce-skill-row { display:flex; margin-top:5px; }
+.camp-exploration .ce-skill-row { display:flex; flex-wrap:wrap; gap:3px; }
+.ce-skill { display:inline-block; font-size:10px; line-height:1.3; font-weight:650; border:1px solid transparent; border-radius:4px; padding:2px 4px; white-space:normal; }
+.ce-skill--proficient { color:#14572e; background:#d9f1df; border-color:#85bb92; }
+.ce-skill--expertise { color:#134579; background:#d9eafa; border-color:#76a6d9; }
+.ce-skill--untrained { color:#872827; background:#f9d9d6; border-color:#d6a09c; }
+.ce-skill--unknown { color:#5a5660; background:#e8e5ea; border-color:#b3adb9; }
+.ce-skill--ability { color:#5b491c; background:#f8edc9; border-color:#cab677; }
+.ce-skill b { font-size:12px; margin-left:1px; }
+/* DialogV2 renders outside the board application; these must not be board-scoped. */
+.ce-role-dialog { font-size:13px; min-width:min(540px,70vw); }
+.ce-role-dialog p { margin:0 0 10px; line-height:1.7; }
+.ce-role-choices { max-height:min(58vh,530px); overflow:auto; border:1px solid var(--color-border-light-2,#9b8e79); border-radius:6px; }
+.ce-role-option { display:flex; gap:10px; align-items:flex-start; padding:9px 11px; border-bottom:1px solid #beb5a4; cursor:pointer; }
+.ce-role-option:last-child { border-bottom:0; }
+.ce-role-option:nth-child(odd) { background:rgba(160,140,100,.08); }
+.ce-role-option:has(input:checked) { outline:2px solid #a7773e; outline-offset:-2px; background:rgba(182,135,70,.16); }
+.ce-role-option input { margin-top:4px; flex:0 0 auto; }
+.ce-role-option-body { display:flex; flex-direction:column; gap:3px; min-width:0; }
+.ce-role-option-head { display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+.ce-role-option-head em { color:#92312f; font-weight:600; font-size:11px; }
+.ce-role-note { font-size:11px; opacity:.8; }
+.ce-role-unavailable { cursor:not-allowed; opacity:.67; }
+.ce-role-dialog .ce-skill-row { margin-top:4px; }
+
+.ce-skill--partial { color:#765418; background:#f6e6b8; border-color:#d8b875; }

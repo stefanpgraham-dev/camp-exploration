@@ -9,7 +9,11 @@
       <span class="ce-tag">Chaos factor <strong>{{chaos}}</strong></span>
       {{#if gm}}
         <label class="ce-inline">Adjust <input class="ce-chaos-input" data-ce-field="chaos" type="number" min="0" max="9" value="{{chaos}}" /></label>
-        <button type="button" data-ce-action="advance"><i class="fa-solid fa-forward-step"></i> Next day</button>
+        <div class="ce-gm-actions">
+          <button type="button" data-ce-action="rest"><i class="fa-solid fa-bed"></i> Party rest</button>
+          <button type="button" data-ce-action="resetDay" class="ce-reset-day"><i class="fa-solid fa-rotate-left"></i> Reset day</button>
+          <button type="button" data-ce-action="advance"><i class="fa-solid fa-forward-step"></i> Next day</button>
+        </div>
       {{/if}}
     </div>
   </header>
@@ -26,9 +30,15 @@
         {{#each players}}
           <tr>
             <td class="ce-player"><strong>{{name}}</strong><small>{{actorName}}</small></td>
-            <td><select data-ce-field="exploration0" data-user-id="{{id}}" {{#unless editable}}disabled{{/unless}}>{{#each exploration0}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}</select></td>
+            <td><button type="button" class="ce-pick" data-ce-action="pick-role" data-ce-field="exploration0" data-user-id="{{id}}" aria-label="Choose exploration duty for {{name}}" {{#unless editable}}disabled{{/unless}}>
+                <span class="ce-pick-title">{{exploration0.name}} <i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span>
+                {{#unless exploration0.empty}}<span class="ce-skill-row">{{#each exploration0.skills}}<span class="ce-skill ce-skill--{{state}}" title="{{explanation}}"><span aria-hidden="true">{{prefix}}</span> {{name}}{{#if mandatory}}<b title="Required">*</b>{{/if}}</span>{{/each}}</span>{{/unless}}
+              </button></td>
             <td class="ce-roll-cell"><button type="button" class="ce-roll" data-ce-action="roll" data-stage="exploration" data-slot="0" data-user-id="{{id}}" {{#unless canRollExp0}}disabled{{/unless}}><i class="fa-solid fa-dice-d20"></i> Roll</button>{{#if expRolled0}}<span class="ce-result">{{expResult0}}</span>{{/if}}</td>
-            <td><select data-ce-field="exploration1" data-user-id="{{id}}" {{#unless editable}}disabled{{/unless}}>{{#each exploration1}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}</select></td>
+            <td><button type="button" class="ce-pick" data-ce-action="pick-role" data-ce-field="exploration1" data-user-id="{{id}}" aria-label="Choose secondary exploration duty for {{name}}" {{#unless canPickExploration1}}disabled{{/unless}}>
+                <span class="ce-pick-title">{{exploration1.name}} <i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span>
+                {{#unless exploration1.empty}}<span class="ce-skill-row">{{#each exploration1.skills}}<span class="ce-skill ce-skill--{{state}}" title="{{explanation}}"><span aria-hidden="true">{{prefix}}</span> {{name}}{{#if mandatory}}<b title="Required">*</b>{{/if}}</span>{{/each}}</span>{{/unless}}
+              </button></td>
             <td class="ce-roll-cell"><button type="button" class="ce-roll" data-ce-action="roll" data-stage="exploration" data-slot="1" data-user-id="{{id}}" {{#unless canRollExp1}}disabled{{/unless}}><i class="fa-solid fa-dice-d20"></i> Roll</button>{{#if expRolled1}}<span class="ce-result">{{expResult1}}</span>{{/if}}</td>
           </tr>
         {{/each}}
@@ -36,7 +46,7 @@
       </table>
     </div>
     <details class="ce-reference"><summary>Exploration role skill reference</summary><div class="ce-reference-grid">{{#each explorationRoles}}<p><strong>{{name}}</strong><span>{{note}}</span></p>{{/each}}</div></details>
-    <p class="ce-footnote">Required first-listed skill proficiency is checked for standard skills. Tool proficiency is not automatically verified.</p>
+    <p class="ce-footnote">Click a role to compare all its skills at a glance. Green ✓ means proficient, blue ★ expertise, red × not proficient, grey ? requires a sheet check. * marks a required proficiency.</p>
   </section>
 
   <section class="ce-panel">
@@ -59,7 +69,10 @@
         {{#each players}}
           <tr>
             <td class="ce-player"><strong>{{name}}</strong></td>
-            <td><select data-ce-field="finder" data-user-id="{{id}}" {{#unless editable}}disabled{{/unless}}>{{#each finder}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}</select></td>
+            <td><button type="button" class="ce-pick" data-ce-action="pick-role" data-ce-field="finder" data-user-id="{{id}}" aria-label="Choose campsite-finding duty for {{name}}" {{#unless editable}}disabled{{/unless}}>
+                <span class="ce-pick-title">{{finder.name}} <i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span>
+                {{#unless finder.empty}}<span class="ce-skill-row">{{#each finder.skills}}<span class="ce-skill ce-skill--{{state}}" title="{{explanation}}"><span aria-hidden="true">{{prefix}}</span> {{name}}{{#if mandatory}}<b title="Required">*</b>{{/if}}</span>{{/each}}</span>{{/unless}}
+              </button></td>
             <td class="ce-roll-cell"><button type="button" class="ce-roll" data-ce-action="roll" data-stage="finder" data-user-id="{{id}}" {{#unless canRollFinder}}disabled{{/unless}}><i class="fa-solid fa-dice-d20"></i> Roll</button>{{#if finderRolled}}<span class="ce-result">{{finderTotal}}</span>{{/if}}</td>
           </tr>
         {{/each}}
@@ -87,9 +100,15 @@
         {{#each players}}
           <tr>
             <td class="ce-player"><strong>{{name}}</strong></td>
-            <td><select data-ce-field="camp0" data-user-id="{{id}}" {{#unless editable}}disabled{{/unless}}>{{#each camp0}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}</select></td>
+            <td><button type="button" class="ce-pick" data-ce-action="pick-role" data-ce-field="camp0" data-user-id="{{id}}" aria-label="Choose camp duty for {{name}}" {{#unless editable}}disabled{{/unless}}>
+                <span class="ce-pick-title">{{camp0.name}} <i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span>
+                {{#unless camp0.empty}}<span class="ce-skill-row">{{#each camp0.skills}}<span class="ce-skill ce-skill--{{state}}" title="{{explanation}}"><span aria-hidden="true">{{prefix}}</span> {{name}}{{#if mandatory}}<b title="Required">*</b>{{/if}}</span>{{/each}}</span>{{/unless}}
+              </button></td>
             <td class="ce-roll-cell"><button type="button" class="ce-roll" data-ce-action="roll" data-stage="camp" data-slot="0" data-user-id="{{id}}" {{#unless canRollCamp0}}disabled{{/unless}}><i class="fa-solid fa-dice-d20"></i> Roll</button>{{#if campRolled0}}<span class="ce-result">{{campResult0}}</span>{{/if}}</td>
-            <td><select data-ce-field="camp1" data-user-id="{{id}}" {{#unless editable}}disabled{{/unless}}>{{#each camp1}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}</select></td>
+            <td><button type="button" class="ce-pick" data-ce-action="pick-role" data-ce-field="camp1" data-user-id="{{id}}" aria-label="Choose secondary camp duty for {{name}}" {{#unless canPickCamp1}}disabled{{/unless}}>
+                <span class="ce-pick-title">{{camp1.name}} <i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span>
+                {{#unless camp1.empty}}<span class="ce-skill-row">{{#each camp1.skills}}<span class="ce-skill ce-skill--{{state}}" title="{{explanation}}"><span aria-hidden="true">{{prefix}}</span> {{name}}{{#if mandatory}}<b title="Required">*</b>{{/if}}</span>{{/each}}</span>{{/unless}}
+              </button></td>
             <td class="ce-roll-cell"><button type="button" class="ce-roll" data-ce-action="roll" data-stage="camp" data-slot="1" data-user-id="{{id}}" {{#unless canRollCamp1}}disabled{{/unless}}><i class="fa-solid fa-dice-d20"></i> Roll</button>{{#if campRolled1}}<span class="ce-result">{{campResult1}}</span>{{/if}}</td>
           </tr>
         {{/each}}
@@ -109,7 +128,7 @@
           {{#each players}}
             <tr><td class="ce-player"><strong>{{name}}</strong></td>
             <td><select data-ce-field="watch" data-user-id="{{id}}" {{#unless editable}}disabled{{/unless}}>{{#each watch}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}</select></td>
-            <td class="ce-roll-cell"><button type="button" data-ce-action="roll" data-stage="watch" data-user-id="{{id}}" class="ce-roll" {{#unless canRollWatch}}disabled{{/unless}}><i class="fa-solid fa-dice-d20"></i> Roll</button>{{#if watchRolled}}<span class="ce-result">{{watchResult}}</span>{{/if}}</td>
+            <td class="ce-roll-cell"><span class="ce-skill ce-skill--{{watchSkill.state}}" title="{{watchSkill.explanation}}">{{watchSkill.prefix}} Perception</span> <button type="button" data-ce-action="roll" data-stage="watch" data-user-id="{{id}}" class="ce-roll" {{#unless canRollWatch}}disabled{{/unless}}><i class="fa-solid fa-dice-d20"></i> Roll</button>{{#if watchRolled}}<span class="ce-result">{{watchResult}}</span>{{/if}}</td>
             </tr>
           {{/each}}
           </tbody>
@@ -133,5 +152,5 @@
       {{#if supplyRolled}}<p class="ce-hint">Today's supply check is complete.</p>{{/if}}
     </section>
   </div>
-  <footer class="ce-footer">Foundry v14 &middot; D&D 5e &middot; Results are advisory; this module does not automatically grant rests or apply event effects.</footer>
+  <footer class="ce-footer">Foundry v14 &middot; D&D 5e &middot; The GM can apply party rests. Natural 1/20 event effects remain advisory.</footer>
 </div>

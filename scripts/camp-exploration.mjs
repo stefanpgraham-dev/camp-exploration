@@ -102,10 +102,32 @@ function naturalFrom(roll) {
   const kept = die.results?.find(r => r.active !== false && r.discarded !== true);
   return Number.isFinite(kept?.result) ? kept.result : null;
 }
-function selectOptions(options, selected, label="— Not assigned —") {
-  return [{id:"",label,selected:selected === ""}, ...options.map(item=>({
-    id:item.id, label:item.name, selected:item.id === selected
-  }))];
+function skillBadges(actor, roleDef) {
+  return (roleDef?.checks || []).map(code => {
+    const name = SKILLS[code] || OTHER[code] || code;
+    const mandatory = roleDef.required === code && !!SKILLS[code];
+    let state = "unknown", prefix = "?", explanation = "Check character sheet";
+    if (SKILLS[code] && actor) {
+      const rank = Number(actor.system?.skills?.[code]?.value || 0);
+      if (rank >= 2) { state = "expertise"; prefix = "★"; explanation = "Expertise"; }
+      else if (rank >= 1) { state = "proficient"; prefix = "✓"; explanation = "Proficient"; }
+      else if (rank > 0) { state = "partial"; prefix = "½"; explanation = "Half proficiency"; }
+      else { state = "untrained"; prefix = "×"; explanation = "Not proficient"; }
+    } else if (code === "str") {
+      state = "ability"; prefix = "–"; explanation = "Ability check; no skill proficiency needed";
+    }
+    return {name, state, prefix, mandatory, explanation};
+  });
+}
+function roleDisplay(stage, key, actor, placeholder) {
+  const def = role(stage, key);
+  return {name: def?.name || placeholder, empty: !def, skills:skillBadges(actor, def)};
+}
+// Skill chips appear both in selected-role buttons and alongside every option in the picker.
+function skillBadgesHTML(actor, def) {
+  return skillBadges(actor, def).map(({name,state,prefix,mandatory,explanation}) =>
+    `<span class="ce-skill ce-skill--${state}" title="${foundry.utils.escapeHTML(explanation)}${mandatory ? " · Required" : ""}"><span aria-hidden="true">${prefix}</span> ${foundry.utils.escapeHTML(name)}${mandatory ? "<b aria-label=\"Required\">*</b>" : ""}</span>`
+  ).join("");
 }
 function selectSimple(options, selected) {
   return options.map(item => ({id:item.id, label:item.name, selected:item.id === selected}));
@@ -142,7 +164,7 @@ function mutate(action, payload) {
     const uid = String(payload.userId || "");
     const user = game.users.get(uid);
     const actor = actorFor(uid);
-    const gmOnly = ["dc","chaos","advance","supply", "resupply", "reset"].includes(action);
+    const gmOnly = ["dc","chaos","advance","resetDay","supply", "resupply", "reset"].includes(action);
     // Non-GM players are shown controls for their own rows only. Requests are checked
     // for known users and valid values; no client can directly modify world settings.
     if (gmOnly && !payload.fromGM) return;
@@ -166,7 +188,7 @@ function mutate(action, payload) {
         if (value && !eligible(uid,role(stage,value))) return notifyProblem(`${user.name} needs proficiency in ${SKILLS[role(stage,value).required]} for ${role(stage,value).name}.`);
         const selected=[...(a[stage] || ["",""])];
         if (value && selected[1-idx] === value) return;
-        if (stage === "camp" && idx === 1 && selected[0] === "fullrest") return;
+        if (stage === "camp" && idx === 1 && (selected[0] === "fullrest" || value === "fullrest")) return;
         selected[idx]=value;
         if (!selected[0] || (stage === "camp" && selected[0] === "fullrest")) selected[1]="";
         a[stage]=selected;
@@ -208,6 +230,10 @@ function mutate(action, payload) {
       state.chaos=chaos;
     } else if (action === "advance") {
       state.day+=1; state.site={scout:null,guide:null,outcome:null}; state.history={};
+    } else if (action === "resetDay") {
+      // Retry the CURRENT day: no changes to day number, supply, DC or chaos.
+      state.assignments={}; state.history={}; state.site={scout:null,guide:null,outcome:null};
+      // Supply status is NOT rewound: the prior depletion/check remains recorded.
     } else if (action === "resupply") {
       const die=Number(payload.value);
       if (![8,10,12].includes(die)) return;
@@ -222,8 +248,8 @@ function mutate(action, payload) {
       if (roll.total <= 2) state.supply.die=SUPPLY_SIZES[SUPPLY_SIZES.indexOf(die)+1] ?? 0;
       await ChatMessage.create({content:roll.total <= 2 ? `<strong>Supplies shrink:</strong> d${die} → ${state.supply.die ? `d${state.supply.die}` : "depleted"}.` : `<strong>Supplies hold:</strong> still d${die}.`});
     } else if (action === "reset") {
-      // A new expedition keeps player assignments, but resets day and roll results.
-      state.day=1; state.history={}; state.site={scout:null,guide:null,outcome:null}; state.supply.lastDay=0;
+      state.day=1; state.assignments={}; state.history={};
+      state.site={scout:null,guide:null,outcome:null}; state.supply.lastDay=0;
     } else return;
     await save(state);
   }).catch(error => console.error(`${ID} | State update failed`, error));
@@ -251,11 +277,13 @@ class CampBoard extends HandlebarsApplicationMixin(ApplicationV2) {
       const a=assignment(state,user.id), actor=actorFor(user.id);
       const editable=game.user.isGM || game.user.id === user.id;
       const hist=(stage,slot)=>state.history[`${state.day}:${stage}:${user.id}:${slot}`];
-      const choices=(stage,idx)=>selectOptions(CATALOG[stage],a[stage]?.[idx] || "",idx ? "— No second duty —" : "— Choose a role —");
+      const choices=(stage,idx)=>roleDisplay(stage,a[stage]?.[idx] || "",actor,idx ? "— No second duty —" : "— Choose a role —");
       const rolled0=hist("exploration",0),rolled1=hist("exploration",1),rolledC0=hist("camp",0),rolledC1=hist("camp",1);
       return {
         id:user.id,name:user.name,active:user.active,actorName:actor?.name || "No assigned character",
-        editable,hasActor:!!actor,
+        editable,hasActor:!!actor,watchSkill:skillBadges(actor,{checks:["prc"]})[0],
+        canPickExploration1:editable && !!a.exploration?.[0],
+        canPickCamp1:editable && !!a.camp?.[0] && a.camp[0]!=="fullrest",
         exploration0:choices("exploration",0),exploration1:choices("exploration",1),
         camp0:choices("camp",0),camp1:choices("camp",1),
         hasExploration0:!!a.exploration?.[0],hasExploration1:!!a.exploration?.[1],
@@ -266,7 +294,7 @@ class CampBoard extends HandlebarsApplicationMixin(ApplicationV2) {
         canRollCamp1:editable&&!!actor&&!!a.camp?.[1]&&!rolledC1&&a.camp[1]!=="fullrest",
         expResult0:rolled0?.total,expResult1:rolled1?.total,campResult0:rolledC0?.total,campResult1:rolledC1?.total,
         expRolled0:!!rolled0,expRolled1:!!rolled1,campRolled0:!!rolledC0,campRolled1:!!rolledC1,
-        finder:selectOptions(CATALOG.finder,a.finder || "","— Not finding —"),
+        finder:roleDisplay("finder",a.finder || "",actor,"— Not finding —"),
         watch:selectSimple(WATCHES,a.watch||""),
         finderSelected:!!a.finder,
         finderRolled:!!(a.finder && state.site[a.finder]?.day===state.day),
@@ -302,35 +330,97 @@ class CampBoard extends HandlebarsApplicationMixin(ApplicationV2) {
     root.querySelectorAll("[data-ce-field]").forEach(el=>el.addEventListener("change",event=>{
       const target=event.currentTarget;
       const field=target.dataset.ceField;
-      const userId=target.dataset.userId;
       if (field === "dc" || field === "chaos") send(field,{value:target.value});
       else if (field === "resupply") send("resupply",{value:target.value});
-      else {
-        const stage = field === "finder" ? "finder" : field.replace(/[01]$/, "");
-        const roleDef = role(stage,target.value);
-        if (field === "finder" && target.value && Object.entries(safeState().assignments).some(([otherId,other])=>otherId !== userId && other.finder === target.value)) {
-          notifyProblem(`${roleDef.name} has already been chosen by another player.`);
-          this.render();
-          return;
-        }
-        if (roleDef && !eligible(userId,roleDef)) {
-          notifyProblem(`${SKILLS[roleDef.required] || roleDef.required} proficiency is required for ${roleDef.name}.`);
-          this.render();
-          return;
-        }
-        send("assign",{userId,field,value:target.value});
-      }
+      else send("assign",{userId:target.dataset.userId,field,value:target.value});
     }));
     root.querySelectorAll("[data-ce-action]").forEach(el=>el.addEventListener("click",async event=>{
       const target=event.currentTarget;
       const action=target.dataset.ceAction;
-      if(action === "roll") await this._roll(target.dataset.userId,target.dataset.stage,Number(target.dataset.slot||0));
-      else if(action === "supply" || action === "advance" || action === "reset") {
+      if (action === "pick-role") await this._pickRole(target.dataset.userId,target.dataset.ceField);
+      else if (action === "roll") await this._roll(target.dataset.userId,target.dataset.stage,Number(target.dataset.slot||0));
+      else if (action === "rest") await this._restParty();
+      else if (["supply","advance","resetDay","reset"].includes(action)) {
         if (!game.user.isGM) return;
-        if ((action === "reset" || action === "advance") && !await DialogV2.confirm({window:{title:"Confirm journey change"},content:`<p>${action === "reset" ? "Start a new expedition? This clears roll history." : "Move to the next journey day?"}</p>`})) return;
+        if (["resetDay","advance","reset"].includes(action)) {
+          const question = action === "resetDay"
+            ? "Reset the current day? This clears all duty and watch assignments, campsite-finding checks and recorded rolls. The day number, supply die and supply check, chaos factor, and character resources stay unchanged."
+            : action === "reset" ? "Start a new expedition from day 1? This clears all assignments and recorded rolls."
+            : "Move to the next journey day? Existing role assignments remain.";
+          if (!await DialogV2.confirm({window:{title:"Confirm journey change"},content:`<p>${question}</p>`})) return;
+        }
         await send(action);
       }
     }));
+  }
+  async _pickRole(userId,field) {
+    if (!game.user.isGM && userId !== game.user.id) return;
+    const state = safeState();
+    const match=/^(exploration|camp)([01])$/.exec(field);
+    const stage = field === "finder" ? "finder" : match?.[1];
+    if (!stage) return;
+    const actor=actorFor(userId), a=assignment(state,userId);
+    const selected=field === "finder" ? a.finder : a[stage]?.[Number(match[2])] || "";
+    const name=game.users.get(userId)?.name || "Player";
+    if (match?.[2] === "1" && (!a[stage]?.[0] || (stage === "camp" && a[stage][0] === "fullrest")))
+      return notifyProblem("Choose an active primary duty before adding a second duty.");
+    const emptyLabel = field === "finder" ? "Not finding campsite" : field.endsWith("1") ? "No second duty" : "Not assigned";
+    const options=[{id:"",name:emptyLabel},...CATALOG[stage]];
+    const rows=options.map(def=>{
+      const allowed=!def.id || eligible(userId,def);
+      const conflicting=stage === "finder" && !!def.id && Object.entries(state.assignments)
+        .some(([id,entry])=>id!==userId && entry.finder===def.id);
+      const duplicate=!!def.id && !!match && a[stage]?.[1-Number(match[2])]===def.id;
+      const secondFullRest=!!match && match[1] === "camp" && match[2] === "1" && def.id === "fullrest";
+      const blocked=!!def.id && (conflicting || duplicate || !allowed || secondFullRest);
+      const reason=conflicting ? "Already assigned" : duplicate ? "Already selected" : !allowed ? "Required skill missing" : secondFullRest ? "Not a second duty" : "";
+      return `<label class="ce-role-option${blocked ? " ce-role-unavailable" : ""}">
+        <input type="radio" name="role" value="${def.id}" ${def.id === selected ? "checked" : ""} ${blocked ? "disabled" : ""}/>
+        <span class="ce-role-option-body"><span class="ce-role-option-head"><strong>${foundry.utils.escapeHTML(def.name)}</strong>${reason ? `<em>${reason}</em>` : ""}</span>
+        ${def.note ? `<span class="ce-role-note">${foundry.utils.escapeHTML(def.note)}</span>` : ""}
+        <span class="ce-skill-row">${skillBadgesHTML(actor,def)}</span></span>
+      </label>`;
+    }).join("");
+    const result=await DialogV2.input({window:{title:`Choose ${stage === "finder" ? "campsite finder" : stage} role — ${name}`},
+      content:`<div class="ce-role-dialog"><p>Skill colours refer to <strong>${foundry.utils.escapeHTML(actor?.name || "an unassigned character")}</strong>. <span class="ce-skill ce-skill--proficient">✓ Proficient</span> <span class="ce-skill ce-skill--untrained">× Not proficient</span> <span class="ce-skill ce-skill--expertise">★ Expertise</span> <span class="ce-skill ce-skill--partial">½ Half proficiency</span> <span class="ce-skill ce-skill--unknown">? Check sheet</span><br/><small>* Required proficiency. Tool proficiencies may need manual checking.</small></p><div class="ce-role-choices">${rows}</div></div>`,
+      ok:{label:"Assign role"}});
+    if (!result || typeof result.role !== "string") return;
+    if (result.role === selected) return;
+    const chosen=role(stage,result.role);
+    if (chosen && !eligible(userId,chosen)) return notifyProblem("Required skill proficiency is missing.");
+    if (chosen && stage === "finder" && Object.entries(safeState().assignments).some(([id,x])=>id!==userId && x.finder===result.role))
+      return notifyProblem("This campsite-finding role is already assigned.");
+    await send("assign",{userId,field,value:result.role});
+  }
+  async _restParty() {
+    if (!game.user.isGM) return;
+    // Unique assigned character documents; never rest NPCs or the same actor twice.
+    const actors=[...new Map(game.users.filter(user=>!user.isGM && user.character?.type === "character")
+      .map(user=>[user.character.uuid || user.character.id,user.character])).values()];
+    if (!actors.length) return notifyProblem("No player characters are assigned to non-GM users.");
+    const choice=await DialogV2.input({window:{title:"Party rest — GM only"},
+      content:`<div class="form-group"><label>Rest type</label><select name="restType"><option value="short">Short rest</option><option value="long">Long rest</option></select></div><p>Apply the selected D&D 5e rest to ${actors.length} assigned player character(s). Short rests may open each character's Hit Dice dialog. The journey day and assignments are not changed.</p>`,
+      ok:{label:"Continue"}});
+    const kind=choice?.restType;
+    if (!["short","long"].includes(kind)) return;
+    const names=actors.map(actor=>foundry.utils.escapeHTML(actor.name)).join(", ");
+    const confirmed=await DialogV2.confirm({window:{title:`Confirm ${kind} rest`},
+      content:`<p>Apply a <strong>${kind} rest</strong> to ${actors.length} character(s): ${names}?</p><p>This updates character resources and cannot be undone by Reset Day.</p>`});
+    if (!confirmed) return;
+    let completed=0,skipped=0;
+    const failed=[];
+    for (const actor of actors) {
+      try {
+        const method=kind === "short" ? actor.shortRest : actor.longRest;
+        if (typeof method !== "function") throw new Error("D&D 5e rest API unavailable");
+        const options=kind === "short" ? {dialog:true,chat:true} : {dialog:false,chat:true,newDay:true};
+        const result=await method.call(actor,options);
+        if (result === false || result === null) skipped++;
+        else completed++;
+      } catch (error) { failed.push(actor.name); console.error(`${ID} | Rest failed for ${actor.name}`,error); }
+    }
+    await ChatMessage.create({content:`<strong>Party ${kind} rest:</strong> ${completed} character(s) completed, ${skipped} cancelled${failed.length ? `; failed: ${foundry.utils.escapeHTML(failed.join(", "))}` : ""}. Journey day unchanged.`});
+    if (failed.length) notifyProblem(`Rest failed for ${failed.join(", ")}; see console.`);
   }
   async _roll(userId,stage,slot) {
     if (!game.user.isGM && userId !== game.user.id) return;
@@ -395,7 +485,7 @@ Hooks.once("ready",()=>{
     }
   });
   Hooks.on("updateSetting",(setting)=>{if(setting.key===`${ID}.state`)app?.render();});
-  game.modules.get(ID).api={open:openBoard};
+  game.modules.get(ID).api={open:openBoard,resetDay:()=>game.user.isGM ? mutate("resetDay",{fromGM:true}) : notifyProblem("GM only.")};
   // Persistent button beside the chat entry for both GMs and players.
   Hooks.on("renderChatLog",(_app,html)=>addLauncher(html));
   Hooks.on("renderChatPopout",(_app,html)=>addLauncher(html));

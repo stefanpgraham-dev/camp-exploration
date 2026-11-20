@@ -1,8 +1,8 @@
 name: Publish Foundry release
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
 permissions:
   contents: write
 jobs:
@@ -14,11 +14,15 @@ jobs:
         run: node tests/smoke.mjs
       - name: Build ZIP and manifest
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION=$(python3 -c 'import json; print(json.load(open("module.json"))["version"])')
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           python3 tools/package.py --repo "$GITHUB_REPOSITORY" --version "$VERSION"
       - name: Publish release assets
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          name: Camp & Exploration v${{ env.VERSION }}
           files: |
             dist/module.json
             dist/camp-exploration.zip

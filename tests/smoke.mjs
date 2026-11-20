@@ -1,6 +1,8 @@
 /* Node smoke tests. These are NOT substitutes for a Foundry multi-client test. */
 import assert from "node:assert/strict";
 const callbacks={};
+let nextRoleChoice = null, nextRestChoice = null;
+const restCalls=[];
 globalThis.Hooks={
   once:(name,callback)=>(callbacks[name] ??= []).push(callback),
   on:(name,callback)=>(callbacks[name] ??= []).push(callback)
@@ -13,7 +15,10 @@ class Base {
 }
 globalThis.foundry={
   applications:{api:{ApplicationV2:Base,HandlebarsApplicationMixin:Base=>Base,DialogV2:{
-    input:async ({content})=> content.includes('name="bonus"') ? {bonus:2}:{choice:"prc"},
+    input:async ({content})=> content.includes('name="bonus"') ? {bonus:2}
+      : content.includes('name="role"') ? (nextRoleChoice ? {role:nextRoleChoice} : null)
+      : content.includes('name="restType"') ? (nextRestChoice ? {restType:nextRestChoice} : null)
+      : {choice:"prc"},
     confirm:async()=>true
   }}},
   utils:{
@@ -22,7 +27,9 @@ globalThis.foundry={
     escapeHTML:s=>String(s).replaceAll("<","&lt;")
   }
 };
-const makeActor=(name,skills)=>({name,system:{skills:Object.fromEntries(Object.entries(skills).map(([id,value])=>[id,{value}]))},
+const makeActor=(name,skills)=>({id:name,uuid:`Actor.${name}`,type:"character",name,system:{skills:Object.fromEntries(Object.entries(skills).map(([id,value])=>[id,{value}]))},
+  async shortRest(options){restCalls.push({name,kind:"short",options});return {completed:true};},
+  async longRest(options){restCalls.push({name,kind:"long",options});return {completed:true};},
   async rollSkill({skill,rolls}) {
     const adv=!!rolls[0]?.options?.advantage;
     const dis=!!rolls[0]?.options?.disadvantage;
@@ -57,7 +64,14 @@ for(const cb of callbacks.ready||[])await cb();
 assert(typeof module.api.open==='function');
 module.api.open();
 const appRef=Base.last;
-assert.equal((await appRef._prepareContext()).playerCount,2);
+const context = await appRef._prepareContext();
+assert.equal(context.playerCount,2);
+assert.equal(context.players.find(p=>p.id==="p1").watchSkill.state, "proficient");
+assert.equal(context.players.find(p=>p.id==="p2").watchSkill.state, "untrained");
+const template = (await import("node:fs")).readFileSync(new URL("../templates/board.hbs",import.meta.url), "utf8");
+assert(template.includes('data-ce-action="pick-role"'));
+assert(template.includes('data-ce-action="rest"'));
+assert(template.includes('data-ce-action="resetDay"'));
 const socket=handlers['module.camp-exploration'];
 const send=async(action,payload)=>{
   socket({kind:'request',action,payload});
@@ -73,6 +87,16 @@ await send('assign',{userId:'p1',field:'watch',value:'first'});
 assert.equal(current.assignments.p1.finder,'scout');
 assert.equal(current.assignments.p2.finder,'guide');
 assert.equal(current.assignments.p1.watch,'first');
+assert.equal((await appRef._prepareContext()).players.find(p=>p.id==="p1").exploration0.name,"Scout");
+nextRoleChoice="tracker";
+await appRef._pickRole("p1","exploration0");
+await new Promise(resolve=>setTimeout(resolve,0));
+assert.equal(current.assignments.p1.exploration[0],"tracker");
+nextRoleChoice="scout";
+await appRef._pickRole("p1","exploration0");
+await new Promise(resolve=>setTimeout(resolve,0));
+assert.equal(current.assignments.p1.exploration[0],"scout");
+nextRoleChoice=null;
 // Cannot take a role with an untrained first-listed skill.
 await send('assign',{userId:'p1',field:'exploration0',value:'guide'});
 assert.equal(current.assignments.p1.exploration[0],'scout');
@@ -95,9 +119,35 @@ assert.equal(current.history["1:exploration:p1:0"].total,17);
 await send('recordRoll',{userId:'p1',stage:'exploration',slot:0,role:'scout',day:1,total:20,natural:20});
 await send('recordRoll',{userId:'p1',stage:'exploration',slot:0,role:'scout',day:1,total:1,natural:1});
 assert.equal(current.history['1:exploration:p1:0'].total,17);
+// Short and long rest call D&D 5e on each unique assigned PC (GM only).
+nextRestChoice="short";
+await appRef._restParty();
+assert.equal(restCalls.length,2);
+assert(restCalls.every(r=>r.kind==="short" && r.options.dialog === true));
+nextRestChoice="long";
+await appRef._restParty();
+assert.equal(restCalls.length,4);
+assert(restCalls.slice(2).every(r=>r.kind==="long" && r.options.newDay === true));
+nextRestChoice=null;
+// Reset Day is a GM-only board reset; character resources, supply die and chaos persist.
+current.supply.die=6;
+current.supply.lastDay=current.day;
+current.chaos=4;
+await module.api.resetDay();
+assert.equal(current.day,1);
+assert.equal(current.supply.die,6);
+assert.equal(current.supply.lastDay,1);
+assert.equal(current.chaos,4);
+assert.deepEqual(current.assignments,{});
+assert.deepEqual(current.history,{});
+assert.equal(current.site.scout,null);
+assert.equal(current.site.guide,null);
+// Socket requests from players must not be able to reset the board.
+await send('resetDay',{userId:'p1',fromGM:true});
+assert.deepEqual(current.assignments,{});
 // After advance, previous results are cleared; assignments persist.
 // This would be done via GM-only controls: imitate state directly in the mock.
 current.day=2;current.history={};current.site={scout:null,guide:null,outcome:null};
-assert.equal(current.assignments.p2.camp[0],'fullrest');
+assert.equal(current.assignments.p2?.camp?.[0],undefined);
 assert.equal(warnings.length,2);
 console.log('Camp & Exploration smoke tests passed');
