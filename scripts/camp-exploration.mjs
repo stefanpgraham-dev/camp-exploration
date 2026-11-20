@@ -64,9 +64,9 @@ const WATCHES = [
   {id:"fourth",name:"Fourth watch · hours 7–8"}
 ];
 const PACES = [
-  {id:"fast",name:"Fast",rate:"+25%",effect:"Disadvantage: Perception, Survival, Stealth"},
-  {id:"normal",name:"Normal",rate:"Standard",effect:"Disadvantage: Stealth"},
-  {id:"slow",name:"Slow",rate:"−25%",effect:"Advantage: Perception, Survival"}
+  {id:"fast",name:"Fast",rate:"+25%",effect:"Offsets proficiency advantage: Perception, Survival, Stealth"},
+  {id:"normal",name:"Normal",rate:"Standard",effect:"Offsets proficiency advantage: Stealth"},
+  {id:"slow",name:"Slow",rate:"−25%",effect:"Grants advantage: Perception, Survival"}
 ];
 // Descriptive, non-automated suggestions: roles retain one check and no rewards/penalties.
 const ROLE_GUIDANCE = {
@@ -121,10 +121,10 @@ function role(stage, key) { return CATALOG[stage]?.find(r => r.id === key); }
 function assignment(state, uid) {
   return state.assignments[uid] || {exploration:["",""],camp:["",""],finder:"",watch:""};
 }
-// House rule: a pace penalty offsets ordinary proficiency for ROLE ELIGIBILITY;
-// Expertise still qualifies. Slow-pace advantage provides temporary suitability
-// with Perception/Survival even when the character is untrained.
-// Never remove the proficiency bonus from actual D&D 5e rolls.
+// House rule: an applicable pace penalty cancels the ADVANTAGE from
+// ordinary proficiency, not proficiency itself, and never adds disadvantage
+// on its own. Expertise protects one tier, leaving advantage. Slow pace
+// grants advantage even when untrained. This applies to this board only.
 function paceEffect(skill, pace="normal") {
   if (pace === "slow" && ["prc","sur"].includes(skill)) return "advantage";
   if (pace === "fast" && ["prc","sur","ste"].includes(skill)) return "disadvantage";
@@ -134,26 +134,31 @@ function paceEffect(skill, pace="normal") {
 function effectiveQualification(actor, skill, pace="normal") {
   if (!actor || !SKILLS[skill]) return false;
   const rank=Number(actor.system?.skills?.[skill]?.value || 0);
+  return rank >= 1 || paceEffect(skill,pace) === "advantage";
+}
+function proficiencyAdvantageTier(actor, skill, pace="normal") {
+  // 0 = normal, 1 = advantage, 2 = protected advantage from Expertise.
+  // Dice always use normal advantage (never roll three dice), and the
+  // actor's proficiency / Expertise modifiers remain on the character sheet.
+  const rank=SKILLS[skill] ? Number(actor?.system?.skills?.[skill]?.value || 0) : 0;
+  let tier=rank >= 2 ? 2 : rank >= 1 ? 1 : 0;
   const effect=paceEffect(skill,pace);
-  if (effect === "advantage") return true;
-  if (effect === "disadvantage") return rank >= 2;
-  return rank >= 1;
+  if (effect === "advantage") tier=Math.max(1,tier);
+  if (effect === "disadvantage") tier=Math.max(0,tier-1);
+  return tier;
 }
 function eligible(userId, roleDef, pace="normal") {
   if (!roleDef?.required || !SKILLS[roleDef.required]) return true;
   return effectiveQualification(actorFor(userId),roleDef.required,pace);
 }
 function modeFor(actor, roleDef, choice, overloaded, pace="normal") {
-  const primary = roleDef?.required;
-  const pair = roleDef?.pair || [];
-  const both = !!primary && prof(actor, primary) && (choice === primary ? pair.some(p => prof(actor, p)) : pair.includes(choice) && prof(actor, choice));
-  const impact=paceEffect(choice,pace);
-  const paceAdv = impact === "advantage";
-  const paceDis = impact === "disadvantage";
-  // 5e: any source of advantage plus any disadvantage cancel, regardless of count.
-  const hasAdv = both || paceAdv;
-  const hasDis = overloaded || paceDis;
-  return {advantage:hasAdv && !hasDis,disadvantage:hasDis && !hasAdv};
+  // Unlike RAW travel pace, pace penalties only consume the advantage
+  // contributed by proficiency; they never impose disadvantage alone.
+  // Expertise has two suitability tiers, which yields ordinary (single)
+  // advantage even after one pace penalty.
+  const hasAdv=proficiencyAdvantageTier(actor,choice,pace)>0;
+  // Taking a second duty retains its existing independent disadvantage.
+  return {advantage:hasAdv && !overloaded,disadvantage:overloaded && !hasAdv};
 }
 function normalizedRoll(maybe) {
   if (Array.isArray(maybe)) return maybe.map(normalizedRoll).find(Boolean);
@@ -187,15 +192,20 @@ function skillBadges(actor, roleDef, pace="normal") {
       if (impact === "advantage") {
         state = "favoured";
         effect = "ADV";
-        explanation = `${training}; advantage from Slow pace. Counts as suitable for this role even if untrained. Roll retains normal proficiency.`;
+        explanation = `${training}; Slow pace grants advantage to the skill roll (homebrew). Base proficiency bonus is unchanged.`;
       } else if (impact === "disadvantage") {
-        effect = "DIS";
+        const stillAdv=proficiencyAdvantageTier(actor,code,pace)>0;
+        effect = stillAdv ? "ADV" : rank >= 1 ? "EVEN" : "";
         state = rank >= 2 ? "expertise" : rank >= 1 ? "suppressed" : "untrained";
         explanation = rank >= 2
-          ? "Expertise retained for role eligibility; roll has disadvantage and keeps doubled proficiency."
-          : rank >= 1 ? "Pace disadvantage offsets ordinary proficiency for role suitability (homebrew). The dice roll still retains proficiency and has disadvantage."
-          : "Untrained and disadvantaged by travel pace.";
-      } else explanation = training;
+          ? "Expertise retains advantage after the pace penalty (homebrew). Expertise bonus is unchanged."
+          : rank >= 1
+            ? "Pace penalty cancels proficiency-granted advantage: roll normally, keeping proficiency (homebrew)."
+            : "Untrained: pace penalty cannot impose disadvantage on its own; roll normally.";
+      } else {
+        if (rank >= 1) effect="ADV";
+        explanation = `${training}; ${rank >= 1 ? "advantage from proficiency (homebrew)" : "normal roll"}.`;
+      }
     } else if (code === "str") {
       state = "ability"; prefix = "–"; explanation = "Ability check; no skill proficiency needed";
     }
@@ -520,7 +530,7 @@ class CampBoard extends HandlebarsApplicationMixin(ApplicationV2) {
       const badges=skillBadges(actor,def,state.pace);
       const highlight=badges.some(b=>b.state==="favoured") ? " ce-role-favoured"
         : badges.some(b=>b.state==="suppressed") ? " ce-role-penalized" : "";
-      const reason=conflicting ? "Already assigned" : duplicate ? "Already selected" : !allowed ? "Required skill offset by pace" : secondFullRest ? "Not a second duty" : "";
+      const reason=conflicting ? "Already assigned" : duplicate ? "Already selected" : !allowed ? "Required skill proficiency missing" : secondFullRest ? "Not a second duty" : "";
       return `<label class="ce-role-option${blocked ? " ce-role-unavailable" : ""}${highlight}">
         <input type="radio" name="role" value="${def.id}" ${def.id === selected ? "checked" : ""} ${blocked ? "disabled" : ""}/>
         <span class="ce-role-option-body"><span class="ce-role-option-head"><strong>${foundry.utils.escapeHTML(def.name)}</strong>${reason ? `<em>${reason}</em>` : ""}</span>
@@ -529,7 +539,7 @@ class CampBoard extends HandlebarsApplicationMixin(ApplicationV2) {
       </label>`;
     }).join("");
     const result=await DialogV2.input({window:{title:`Choose ${stage === "finder" ? "campsite finder" : stage} role — ${name}`},
-      content:`<div class="ce-role-dialog"><p>Skills for <strong>${foundry.utils.escapeHTML(actor?.name || "an unassigned character")}</strong> · <strong>${foundry.utils.escapeHTML(state.pace.toUpperCase())}</strong> pace.<br/><span class="ce-skill ce-skill--favoured">▲ ADV · pace benefit</span> <span class="ce-skill ce-skill--suppressed">✓ DIS · proficiency offset</span> <span class="ce-skill ce-skill--expertise">★ Expertise</span> <span class="ce-skill ce-skill--proficient">✓ Proficient</span> <span class="ce-skill ce-skill--untrained">× Untrained</span><br/><small>* Required skill. Pace modifies eligibility for roles (homebrew); it does not remove proficiency from dice rolls. Tool proficiency may need manual checking.</small></p><div class="ce-role-choices">${rows}</div></div>`,
+      content:`<div class="ce-role-dialog"><p>Skills for <strong>${foundry.utils.escapeHTML(actor?.name || "an unassigned character")}</strong> · <strong>${foundry.utils.escapeHTML(state.pace.toUpperCase())}</strong> pace.<br/><span class="ce-skill ce-skill--favoured">▲ ADV · Slow pace</span> <span class="ce-skill ce-skill--suppressed">✓ EVEN · pace offset</span> <span class="ce-skill ce-skill--expertise">★ ADV · Expertise</span> <span class="ce-skill ce-skill--proficient">✓ ADV · Proficient</span> <span class="ce-skill ce-skill--untrained">× Untrained</span><br/><small>* Required skill. Pace penalty cancels one proficiency advantage tier but cannot impose disadvantage by itself. Expertise retains advantage. D&D skill bonuses remain intact; second-duty disadvantage still applies. Tools may need manual verification.</small></p><div class="ce-role-choices">${rows}</div></div>`,
       ok:{label:"Assign role"}});
     if (!result || typeof result.role !== "string") return;
     if (result.role === selected) return;

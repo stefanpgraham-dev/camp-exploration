@@ -134,20 +134,31 @@ assert.equal(current.pace,'fast');
 // Fast pace shows the trained Ranger's Perception as amber rather than green.
 let fastCtx=await appRef._prepareContext();
 assert.equal(fastCtx.players.find(p=>p.id==='p1').watchSkill.state,'suppressed');
-assert.equal(fastCtx.players.find(p=>p.id==='p1').watchSkill.effect,'DIS');
+assert.equal(fastCtx.players.find(p=>p.id==='p1').watchSkill.effect,'EVEN');
 assert.equal(fastCtx.players.find(p=>p.id==='p2').watchSkill.state,'untrained');
-// Expertise stays eligible, but the pace disadvantage is still on the dice.
+// Expertise retains advantage after one pace penalty.
 p1.character.system.skills.prc.value=2;
 fastCtx=await appRef._prepareContext();
 assert.equal(fastCtx.players.find(p=>p.id==='p1').watchSkill.state,'expertise');
-assert.equal(fastCtx.players.find(p=>p.id==='p1').watchSkill.effect,'DIS');
+assert.equal(fastCtx.players.find(p=>p.id==='p1').watchSkill.effect,'ADV');
+await appRef._roll("p1","watch",0);
+await new Promise(resolve=>setTimeout(resolve,0));
+assert.equal(rollCalls.at(-1).options.advantage,true);
+assert.equal(rollCalls.at(-1).options.disadvantage,false);
+delete current.history["1:watch:p1:0"];
 p1.character.system.skills.prc.value=1;
-// Fast gives disadvantage on a Perception watch check.
+// Fast does not disqualify an ordinarily proficient role.
+await send('assign',{userId:'p1',field:'exploration0',value:'tracker'});
+assert.equal(current.assignments.p1.exploration[0],'tracker');
+await send('assign',{userId:'p1',field:'exploration0',value:'scout'});
+assert.equal(current.assignments.p1.exploration[0],'scout');
+// Fast cancels ADV from ordinary proficiency, without imposing DIS.
 await appRef._roll("p1","watch",0);
 await new Promise(resolve=>setTimeout(resolve,0));
 assert.equal(rollCalls.at(-1).skill,'prc');
-assert.equal(rollCalls.at(-1).options.disadvantage,true);
-// In the Scout role, paired proficiencies provide advantage, so Fast cancels it.
+assert.equal(rollCalls.at(-1).options.advantage,false);
+assert.equal(rollCalls.at(-1).options.disadvantage,false);
+// The same cancellation applies to the Scout check.
 await appRef._roll("p1","exploration",0);
 await new Promise(resolve=>setTimeout(resolve,0));
 assert.equal(rollCalls.at(-1).options.advantage,false);
@@ -158,6 +169,13 @@ assert.equal(current.history["1:exploration:p1:0"].total,17);
 await send('recordRoll',{userId:'p1',stage:'exploration',slot:0,role:'scout',day:1,total:20,natural:20});
 await send('recordRoll',{userId:'p1',stage:'exploration',slot:0,role:'scout',day:1,total:1,natural:1});
 assert.equal(current.history['1:exploration:p1:0'].total,17);
+// Two simultaneous duties impose their own disadvantage, even after pace cancels ADV.
+await send('assign',{userId:'p1',field:'exploration1',value:'traveller'});
+await appRef._roll("p1","exploration",1);
+await new Promise(resolve=>setTimeout(resolve,0));
+assert.equal(rollCalls.at(-1).skill,'sur');
+assert.equal(rollCalls.at(-1).options.disadvantage,true);
+await send('assign',{userId:'p1',field:'exploration1',value:''});
 // A Slow pace grants advantage on Perception and Survival, including camp watches.
 await module.api.setPace('slow');
 const slowCtx=await appRef._prepareContext();
@@ -180,27 +198,28 @@ delete current.history['1:watch:p1:0']; // isolated test for another check
 await appRef._roll("p1","watch",0);
 await new Promise(resolve=>setTimeout(resolve,0));
 assert.equal(rollCalls.at(-1).options.advantage,true);
-// Normal pace applies disadvantage on Stealth, including Other Downtime choices.
+// Normal pace offsets proficiency ADV on Stealth, never imposing disadvantage by itself.
 await module.api.setPace('normal');
-// Normal Stealth penalty offsets an ordinary proficiency for role suitability,
-// but Expertise remains visibly blue and sufficient.
+// Normal Stealth penalty cancels an ordinary proficiency's ADV,
+// while Expertise remains visibly blue with ADV.
 p1.character.system.skills.ste={value:1};
 let normalCtx=await appRef._prepareContext();
 let stealthBadge=normalCtx.players.find(p=>p.id==='p1').exploration0.skills.find(x=>x.name==='Stealth');
 assert.equal(stealthBadge.state,'suppressed');
-assert.equal(stealthBadge.effect,'DIS');
+assert.equal(stealthBadge.effect,'EVEN');
 p1.character.system.skills.ste.value=2;
 normalCtx=await appRef._prepareContext();
 stealthBadge=normalCtx.players.find(p=>p.id==='p1').exploration0.skills.find(x=>x.name==='Stealth');
 assert.equal(stealthBadge.state,'expertise');
-assert.equal(stealthBadge.effect,'DIS');
+assert.equal(stealthBadge.effect,'ADV');
 p1.character.system.skills.ste.value=0;
 await send('assign',{userId:'p2',field:'camp0',value:'downtime'});
 nextCheckChoice='ste';
 await appRef._roll("p2","camp",0);
 await new Promise(resolve=>setTimeout(resolve,0));
 assert.equal(rollCalls.at(-1).skill,'ste');
-assert.equal(rollCalls.at(-1).options.disadvantage,true);
+assert.equal(rollCalls.at(-1).options.advantage,false);
+assert.equal(rollCalls.at(-1).options.disadvantage,false);
 // N/A does not roll dice, use manual modifier, or create an unmarked roll.
 delete current.history['1:camp:p2:0'];
 nextCheckChoice='na';
@@ -268,6 +287,8 @@ assert.deepEqual(nextTables.map(x=>x.scrollLeft),[100,29,75]);
 assert.deepEqual(nextRefs.map(x=>x.open),[false,true,false]);
 const css=(await import("node:fs")).readFileSync(new URL("../styles/camp-exploration.css",import.meta.url),"utf8");
 assert(css.includes(".ce-scroll button.ce-pick") && css.includes("height:auto !important"));
+assert(css.includes(".ce-pace-choice::before") && css.includes('input[type="radio"]'));
+assert(css.includes("opacity:0") && css.includes("align-self:center"));
 // Socket requests from players must not be able to reset the board.
 await send('resetDay',{userId:'p1',fromGM:true});
 assert.deepEqual(current.assignments,{});
