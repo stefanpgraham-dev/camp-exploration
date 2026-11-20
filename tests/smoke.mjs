@@ -1,8 +1,8 @@
 /* Node smoke tests. These are NOT substitutes for a Foundry multi-client test. */
 import assert from "node:assert/strict";
 const callbacks={};
-let nextRoleChoice = null, nextRestChoice = null;
-const restCalls=[];
+let nextRoleChoice = null, nextRestChoice = null, nextCheckChoice=null;
+const restCalls=[], rollCalls=[];
 globalThis.Hooks={
   once:(name,callback)=>(callbacks[name] ??= []).push(callback),
   on:(name,callback)=>(callbacks[name] ??= []).push(callback)
@@ -19,7 +19,7 @@ globalThis.foundry={
     input:async ({content})=> content.includes('name="bonus"') ? {bonus:2}
       : content.includes('name="role"') ? (nextRoleChoice ? {role:nextRoleChoice} : null)
       : content.includes('name="restType"') ? (nextRestChoice ? {restType:nextRestChoice} : null)
-      : {choice:"prc"},
+      : {choice:nextCheckChoice||"prc"},
     confirm:async()=>true
   }}},
   utils:{
@@ -35,6 +35,7 @@ const makeActor=(name,skills)=>({id:name,uuid:`Actor.${name}`,type:"character",n
     const adv=!!rolls[0]?.options?.advantage;
     const dis=!!rolls[0]?.options?.disadvantage;
     assert(!adv || !dis);
+    rollCalls.push({name,skill,options:rolls[0].options});
     return [{total:skill === "prc" ? 17:19,dice:[{faces:20,results:[{result:16,active:true}]}]}];
   }
 });
@@ -67,12 +68,21 @@ module.api.open();
 const appRef=Base.last;
 const context = await appRef._prepareContext();
 assert.equal(context.playerCount,2);
+assert.equal(context.pace,"normal");
+assert.equal(context.paceOptions.length,3);
+assert.equal(context.watchNames.length,4);
+assert.equal(context.watchNames[3].name,"Fourth watch · hours 7–8");
+assert.match(context.explorationRoles[0].guidance,/route/);
+assert.match(context.campRoles.find(x=>x.id==="downtime").guidance,/skill/);
+assert.match(context.finderRoles[0].guidance,/perimeter/);
 assert.equal(context.players.find(p=>p.id==="p1").watchSkill.state, "proficient");
 assert.equal(context.players.find(p=>p.id==="p2").watchSkill.state, "untrained");
 const template = (await import("node:fs")).readFileSync(new URL("../templates/board.hbs",import.meta.url), "utf8");
 assert(template.includes('data-ce-action="pick-role"'));
 assert(template.includes('data-ce-action="rest"'));
 assert(template.includes('data-ce-action="resetDay"'));
+assert(template.includes('name="ce-pace"'));
+assert(template.includes('role reference &amp; guidance'));
 const socket=handlers['module.camp-exploration'];
 const send=async(action,payload)=>{
   socket({kind:'request',action,payload});
@@ -84,6 +94,8 @@ await send('assign',{userId:'p1',field:'camp0',value:'keepwatch'});
 await send('assign',{userId:'p2',field:'camp0',value:'fullrest'});
 await send('assign',{userId:'p1',field:'finder',value:'scout'});
 await send('assign',{userId:'p2',field:'finder',value:'guide'});
+await send('assign',{userId:'p1',field:'watch',value:'fourth'});
+assert.equal(current.assignments.p1.watch,"fourth");
 await send('assign',{userId:'p1',field:'watch',value:'first'});
 assert.equal(current.assignments.p1.finder,'scout');
 assert.equal(current.assignments.p2.finder,'guide');
@@ -112,14 +124,51 @@ assert.equal(current.site.outcome,null);
 await send('recordRoll',{userId:'p2',stage:'finder',slot:0,role:'guide',day:1,total:19,natural:16});
 assert.match(current.site.outcome,/Good campsite/);
 assert(chat.some(v=>String(v.content||'').includes('Good campsite')));
-// A real player skill roll can be triggered through the same application method.
+// Pace is a GM-controlled shared day setting. Player socket requests are not accepted.
+await send('pace',{value:'fast',fromGM:true});
+assert.equal(current.pace,'normal');
+await module.api.setPace('fast');
+assert.equal(current.pace,'fast');
+// Fast gives disadvantage on a Perception watch check.
+await appRef._roll("p1","watch",0);
+await new Promise(resolve=>setTimeout(resolve,0));
+assert.equal(rollCalls.at(-1).skill,'prc');
+assert.equal(rollCalls.at(-1).options.disadvantage,true);
+// In the Scout role, paired proficiencies provide advantage, so Fast cancels it.
 await appRef._roll("p1","exploration",0);
+await new Promise(resolve=>setTimeout(resolve,0));
+assert.equal(rollCalls.at(-1).options.advantage,false);
+assert.equal(rollCalls.at(-1).options.disadvantage,false);
 await new Promise(resolve=>setTimeout(resolve,0));
 assert.equal(current.history["1:exploration:p1:0"].total,17);
 // A role roll can't overwrite a previous roll.
 await send('recordRoll',{userId:'p1',stage:'exploration',slot:0,role:'scout',day:1,total:20,natural:20});
 await send('recordRoll',{userId:'p1',stage:'exploration',slot:0,role:'scout',day:1,total:1,natural:1});
 assert.equal(current.history['1:exploration:p1:0'].total,17);
+// A Slow pace grants advantage on Perception and Survival, including camp watches.
+await module.api.setPace('slow');
+delete current.history['1:watch:p1:0']; // isolated test for another check
+await appRef._roll("p1","watch",0);
+await new Promise(resolve=>setTimeout(resolve,0));
+assert.equal(rollCalls.at(-1).options.advantage,true);
+// Normal pace applies disadvantage on Stealth, including Other Downtime choices.
+await module.api.setPace('normal');
+await send('assign',{userId:'p2',field:'camp0',value:'downtime'});
+nextCheckChoice='ste';
+await appRef._roll("p2","camp",0);
+await new Promise(resolve=>setTimeout(resolve,0));
+assert.equal(rollCalls.at(-1).skill,'ste');
+assert.equal(rollCalls.at(-1).options.disadvantage,true);
+// N/A does not roll dice, use manual modifier, or create an unmarked roll.
+delete current.history['1:camp:p2:0'];
+nextCheckChoice='na';
+const priorRollCount=rollCalls.length;
+await appRef._roll("p2","camp",0);
+await new Promise(resolve=>setTimeout(resolve,0));
+assert.equal(rollCalls.length,priorRollCount);
+assert.equal(current.history['1:camp:p2:0'].skipped,true);
+assert.equal((await appRef._prepareContext()).players.find(p=>p.id==='p2').campResult0,'N/A');
+nextCheckChoice=null;
 // Short and long rest call D&D 5e on each unique assigned PC (GM only).
 nextRestChoice="short";
 await appRef._restParty();
@@ -134,12 +183,14 @@ nextRestChoice=null;
 current.supply.die=6;
 current.supply.lastDay=current.day;
 current.chaos=4;
+await module.api.setPace("slow");
 await module.api.resetDay();
 assert.equal(current.day,1);
 assert.equal(current.supply.die,6);
 assert.equal(current.supply.lastDay,0); // Reset Day must unlock Check Supply
 assert.equal((await appRef._prepareContext()).canRollSupply,true);
 assert.equal(current.chaos,4);
+assert.equal(current.pace,"slow"); // Same-day reset retains the day's pace
 assert.deepEqual(current.assignments,{});
 assert.deepEqual(current.history,{});
 assert.equal(current.site.scout,null);
@@ -150,6 +201,7 @@ current.supply.lastDay=current.day;
 await module.api.resetDay();
 assert.equal(current.supply.lastDay,0);
 assert.equal(current.supply.die,6);
+assert.equal(current.pace,"slow");
 // Re-rendering must preserve vertical/horizontal scroll and expanded references.
 const oldBoard={scrollTop:498,scrollLeft:16};
 const oldContent={scrollTop:42};
@@ -182,4 +234,7 @@ assert.deepEqual(current.assignments,{});
 current.day=2;current.history={};current.site={scout:null,guide:null,outcome:null};
 assert.equal(current.assignments.p2?.camp?.[0],undefined);
 assert.equal(warnings.length,2);
+await module.api.nextDay();
+assert.equal(current.day,3);
+assert.equal(current.pace,"normal"); // Next Day clears pace-specific effects
 console.log('Camp & Exploration smoke tests passed');

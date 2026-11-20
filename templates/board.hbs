@@ -18,6 +18,23 @@
     </div>
   </header>
 
+  <section class="ce-panel ce-pace-panel" aria-label="Travel pace">
+    <div class="ce-section-heading">
+      <h2><i class="fa-solid fa-person-walking"></i> Travel pace</h2>
+      <p>Applies for journey day {{day}}. Distance is relative to your party's normal travel; no fixed miles.</p>
+    </div>
+    <div class="ce-pace-radio" role="radiogroup" aria-label="Party travel pace">
+      {{#each paceOptions}}
+        <label class="ce-pace-choice{{#if selected}} ce-pace-selected{{/if}}">
+          <input type="radio" name="ce-pace" data-ce-field="pace" value="{{id}}" {{#if selected}}checked{{/if}} {{#unless ../gm}}disabled{{/unless}} />
+          <span class="ce-pace-title">{{name}} <strong>{{rate}}</strong></span>
+          <small>{{effect}}</small>
+        </label>
+      {{/each}}
+    </div>
+    <p class="ce-footnote">The chosen pace changes matching skill checks on this board for today, including camp and watch checks (homebrew extension). Advantage and disadvantage cancel. Next Day returns to Normal; Reset Day retains the selected pace. GM selects the party pace.</p>
+  </section>
+
   <section class="ce-panel">
     <div class="ce-section-heading">
       <h2><i class="fa-solid fa-route"></i> Exploration roles</h2>
@@ -45,7 +62,7 @@
         </tbody>
       </table>
     </div>
-    <details class="ce-reference"><summary>Exploration role skill reference</summary><div class="ce-reference-grid">{{#each explorationRoles}}<p><strong>{{name}}</strong><span>{{note}}</span></p>{{/each}}</div></details>
+    <details class="ce-reference"><summary>Exploration role reference &amp; guidance</summary><div class="ce-reference-grid">{{#each explorationRoles}}<p><strong>{{name}}</strong><span>{{note}}</span><small>{{guidance}}</small></p>{{/each}}</div></details>
     <p class="ce-footnote">Click a role to compare all its skills at a glance. Green ✓ means proficient, blue ★ expertise, red × not proficient, grey ? requires a sheet check. * marks a required proficiency.</p>
   </section>
 
@@ -84,7 +101,7 @@
     {{else}}
       <p class="ce-hint">{{#if findersReady}}Both finders assigned. Roll both checks to determine the campsite.{{else}}Assign one Scout and one Guide before rolling.{{/if}}</p>
     {{/if}}
-    <details class="ce-reference"><summary>Campsite-finding skill reference</summary><div class="ce-reference-grid">{{#each finderRoles}}<p><strong>{{name}}</strong><span>{{note}}</span></p>{{/each}}</div></details>
+    <details class="ce-reference"><summary>Campsite-finding reference &amp; guidance</summary><div class="ce-reference-grid">{{#each finderRoles}}<p><strong>{{name}}</strong><span>{{note}}</span><small>{{guidance}}</small></p>{{/each}}</div></details>
     <p class="ce-footnote">Two successes: good campsite for a long rest. One success: reasonable campsite, possible long rest (GM decision). Both fail: short rest only. DC 0, 5, 10, 15, 20, 25, 30 are taken from the supplied rules.</p>
   </section>
 
@@ -115,12 +132,12 @@
         </tbody>
       </table>
     </div>
-    <details class="ce-reference"><summary>Campsite role skill reference</summary><div class="ce-reference-grid">{{#each campRoles}}<p><strong>{{name}}</strong><span>{{note}}</span></p>{{/each}}</div></details>
+    <details class="ce-reference"><summary>Campsite role reference &amp; guidance</summary><div class="ce-reference-grid">{{#each campRoles}}<p><strong>{{name}}</strong><span>{{note}}</span><small>{{guidance}}</small></p>{{/each}}</div></details>
   </section>
 
   <div class="ce-lower-grid">
     <section class="ce-panel">
-      <div class="ce-section-heading"><h2><i class="fa-solid fa-moon"></i> Campsite watches</h2><p>Optional: each player can take one of three watches, or none.</p></div>
+      <div class="ce-section-heading"><h2><i class="fa-solid fa-moon"></i> Campsite watches</h2><p>Four two-hour watches cover an eight-hour camp rest. Each player may take one watch or none; multiple players can share a slot.</p></div>
       <div class="ce-scroll">
         <table>
           <thead><tr><th>Player</th><th>Watch assignment</th><th>Perception</th></tr></thead>
@@ -152,5 +169,5 @@
       {{#if supplyRolled}}<p class="ce-hint">Today's supply check is complete.</p>{{/if}}
     </section>
   </div>
-  <footer class="ce-footer">Foundry v14 &middot; D&D 5e &middot; The GM can apply party rests. Natural 1/20 event effects remain advisory.</footer>
+  <footer class="ce-footer">Foundry v14 &middot; D&D 5e &middot; Pace effects on camp checks are homebrew. The GM can apply party rests. Natural 1/20 event effects remain advisory.</footer>
 </div>

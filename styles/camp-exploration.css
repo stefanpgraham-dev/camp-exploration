@@ -29,7 +29,7 @@
 .camp-exploration .ce-config-line select {min-width:350px;max-width:420px;}
 .camp-exploration .ce-outcome {margin-top:10px;border-left:4px solid #67784b;background:#e4e8d5;padding:8px 11px;display:flex;gap:8px;flex-direction:column;font-size:12px;}
 .camp-exploration .ce-lower-grid {display:grid;grid-template-columns:minmax(0,1.45fr) minmax(275px,1fr);gap:14px;}
-.camp-exploration .ce-watch-summary {display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:11px;font-size:11px;}
+.camp-exploration .ce-watch-summary {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:11px;font-size:11px;}
 .camp-exploration .ce-watch-summary p {background:#eadcc1;padding:7px;border-radius:4px;}
 .camp-exploration .ce-supply-die {font-size:44px;font-weight:800;text-align:center;color:#5e4224;margin:6px auto; font-family:Georgia,serif;}
 .camp-exploration .ce-supply-actions {display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:13px;}
@@ -103,3 +103,28 @@
 }
 .camp-exploration .ce-scroll .ce-pick .ce-skill { flex:0 0 auto; }
 .camp-exploration .ce-scroll { padding-bottom:3px; }
+
+/* v0.3.0 — compact top-of-board radio pace selector */
+.camp-exploration .ce-pace-panel { padding:11px 14px; }
+.camp-exploration .ce-pace-panel .ce-section-heading { margin-bottom:8px; }
+.camp-exploration .ce-pace-panel h2 { font-size:18px; }
+.camp-exploration .ce-pace-radio { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; }
+.camp-exploration .ce-pace-choice {
+  display:flex; flex-direction:column; gap:5px; min-width:0; cursor:pointer; position:relative;
+  color:#3d3323; background:#f8f0df; border:1px solid #bba98b; border-radius:8px;
+  padding:9px 12px 9px 35px; line-height:1.3;
+}
+.camp-exploration .ce-pace-choice:hover { background:#f5e3c8; }
+.camp-exploration .ce-pace-choice.ce-pace-selected { background:#ead8bb; border-color:#895e32; box-shadow:inset 0 0 0 1px #895e32; }
+.camp-exploration .ce-pace-choice input[type=radio] {
+  position:absolute; left:11px; top:12px; appearance:auto; width:15px; height:15px;
+  margin:0; accent-color:#704524;
+}
+.camp-exploration .ce-pace-title { display:flex; justify-content:space-between; gap:4px; font-size:14px; font-weight:700; }
+.camp-exploration .ce-pace-title strong { font-size:12px; color:#604323; }
+.camp-exploration .ce-pace-choice small { font-size:11px; color:#605440; line-height:1.3; }
+.camp-exploration .ce-pace-choice:has(input:disabled) { cursor:default; }
+.camp-exploration .ce-pace-choice:has(input:disabled):hover { background:#f8f0df; }
+.camp-exploration .ce-pace-choice.ce-pace-selected:has(input:disabled):hover { background:#ead8bb; }
+.camp-exploration .ce-reference-grid small { display:block; font-size:11px; line-height:1.4; color:#4e493c; margin-top:5px; }
+@media(max-width:720px) { .camp-exploration .ce-pace-radio { grid-template-columns:1fr; } }

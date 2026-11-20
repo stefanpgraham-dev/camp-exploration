@@ -4,15 +4,17 @@ const SOCKET = `module.${ID}`;
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
 const SKILLS = {
-  ath: "Athletics", ani: "Animal Handling", dec: "Deception", his: "History",
-  itm: "Intimidation", inv: "Investigation", nat: "Nature", prc: "Perception",
-  per: "Persuasion", prf: "Performance", ste: "Stealth", sur: "Survival"
+  acr:"Acrobatics", ani:"Animal Handling", arc:"Arcana", ath:"Athletics",
+  dec:"Deception", his:"History", ins:"Insight", itm:"Intimidation",
+  inv:"Investigation", med:"Medicine", nat:"Nature", prc:"Perception",
+  per:"Persuasion", prf:"Performance", rel:"Religion", slt:"Sleight of Hand",
+  ste:"Stealth", sur:"Survival"
 };
 const OTHER = {
   str: "Strength check", navigator: "Navigator's tools (manual)", map: "Map (manual)",
   tools: "Appropriate tools (manual)", instrument: "Musical instrument (manual)",
   tinkering: "Tinker's tools (manual)", herbalism: "Herbalism kit (manual)",
-  cooking: "Cook's utensils (manual)", downtime: "Downtime check (manual)"
+  cooking: "Cook's utensils (manual)", downtime: "Choose skill or N/A when rolling", na:"N/A — no check"
 };
 const CATALOG = {
   exploration: [
@@ -54,10 +56,54 @@ const DC_LABELS = [
   {value:25,label:"25 — Utterly inhospitable / untravelled"},
   {value:30,label:"30 — Alien planes / unspeakable horror"}
 ];
-const WATCHES = [{id:"",name:"No watch"},{id:"first",name:"First watch"},{id:"second",name:"Second watch"},{id:"third",name:"Third watch"}];
+const WATCHES = [
+  {id:"",name:"No watch"},
+  {id:"first",name:"First watch · hours 1–2"},
+  {id:"second",name:"Second watch · hours 3–4"},
+  {id:"third",name:"Third watch · hours 5–6"},
+  {id:"fourth",name:"Fourth watch · hours 7–8"}
+];
+const PACES = [
+  {id:"fast",name:"Fast",rate:"+25%",effect:"Disadvantage: Perception, Survival, Stealth"},
+  {id:"normal",name:"Normal",rate:"Standard",effect:"Disadvantage: Stealth"},
+  {id:"slow",name:"Slow",rate:"−25%",effect:"Advantage: Perception, Survival"}
+];
+// Descriptive, non-automated suggestions: roles retain one check and no rewards/penalties.
+const ROLE_GUIDANCE = {
+  exploration:{
+    guide:"Choose an efficient route; identify safe landmarks and potential obstacles.",
+    scout:"Look ahead for threats, tracks and concealed routes before the party arrives.",
+    navigator:"Keep bearings, compare terrain with the map and avoid drifting off course.",
+    tracker:"Identify creatures or travellers who passed through and estimate their direction.",
+    quartermaster:"Keep luggage accessible, balance loads and secure delicate equipment.",
+    cartographer:"Record landmarks, routes and hazards to make future journeys easier.",
+    packmaster:"Keep mounts and pack animals calm, watered and moving together.",
+    entertainer:"Lift spirits and maintain morale during a difficult march.",
+    rearguard:"Watch the party’s trail and discourage or detect anyone following.",
+    traveller:"Keep up with the march and assist the group with routine travel."
+  },
+  finder:{
+    scout:"Examine the perimeter for danger, tracks, visibility and concealed approaches.",
+    guide:"Check shelter, terrain stability, access and whether the site suits the party."
+  },
+  camp:{
+    setcamp:"Pitch shelters, organise bedding and help keep the camp dry and orderly.",
+    keepwatch:"Remain alert while the camp is active; note unusual sights and sounds.",
+    fortify:"Improve cover, reinforce entrances or place simple non-mechanical obstacles.",
+    perimeter:"Inspect nearby ground, approaches and traces of potential visitors.",
+    hunter:"Seek game or set simple traps; the GM decides what resources are available.",
+    forage:"Look for safe plants, herbs or water; the GM adjudicates any useful finds.",
+    leader:"Coordinate duties, settle disputes and keep the camp functioning.",
+    entertainer:"Tell stories, play music or improve the evening’s atmosphere.",
+    cook:"Prepare and distribute meals using what the party already has.",
+    downtime:"Describe the activity, select any applicable skill, or mark N/A without rolling.",
+    fullrest:"Undertake no camp duty; the GM controls actual Short/Long Rest mechanics."
+  }
+};
+const guidance=(stage)=>CATALOG[stage].map(r=>({...r,guidance:ROLE_GUIDANCE[stage]?.[r.id]||""}));
 const SUPPLY_SIZES = [12,10,8,6,4,0];
 const DEFAULT_STATE = {
-  day:1, dc:15, chaos:3, supply:{die:8, lastDay:0}, assignments:{},
+  day:1, dc:15, chaos:3, pace:"normal", supply:{die:8, lastDay:0}, assignments:{},
   history:{}, site:{scout:null,guide:null,outcome:null}
 };
 let app;
@@ -80,12 +126,17 @@ function eligible(userId, roleDef) {
   const actor = actorFor(userId);
   return !!actor && prof(actor, roleDef.required);
 }
-function modeFor(actor, roleDef, choice, overloaded) {
+function modeFor(actor, roleDef, choice, overloaded, pace="normal") {
   const primary = roleDef?.required;
   const pair = roleDef?.pair || [];
   const both = !!primary && prof(actor, primary) && (choice === primary ? pair.some(p => prof(actor, p)) : pair.includes(choice) && prof(actor, choice));
-  // Advantage (two proficiencies) and disadvantage (two duties) cancel.
-  return {advantage: both && !overloaded, disadvantage: overloaded && !both};
+  const paceAdv = pace === "slow" && ["prc","sur"].includes(choice);
+  const paceDis = (pace === "fast" && ["prc","sur","ste"].includes(choice)) ||
+    (pace === "normal" && choice === "ste");
+  // 5e: any source of advantage plus any disadvantage cancel, regardless of count.
+  const hasAdv = both || paceAdv;
+  const hasDis = overloaded || paceDis;
+  return {advantage:hasAdv && !hasDis,disadvantage:hasDis && !hasAdv};
 }
 function normalizedRoll(maybe) {
   if (Array.isArray(maybe)) return maybe.map(normalizedRoll).find(Boolean);
@@ -164,7 +215,7 @@ function mutate(action, payload) {
     const uid = String(payload.userId || "");
     const user = game.users.get(uid);
     const actor = actorFor(uid);
-    const gmOnly = ["dc","chaos","advance","resetDay","supply", "resupply", "reset"].includes(action);
+    const gmOnly = ["dc","chaos","pace","advance","resetDay","supply","resupply","reset"].includes(action);
     // Non-GM players are shown controls for their own rows only. Requests are checked
     // for known users and valid values; no client can directly modify world settings.
     if (gmOnly && !payload.fromGM) return;
@@ -196,7 +247,7 @@ function mutate(action, payload) {
       } else return;
       state.assignments[uid]=a;
     } else if (action === "recordRoll") {
-      if (!user || user.isGM || !Number.isFinite(payload.total)) return;
+      if (!user || user.isGM || (!payload.na && !Number.isFinite(payload.total))) return;
       const stage = String(payload.stage || ""), slot = Number(payload.slot);
       const a = assignment(state,uid);
       if (Number(payload.day) !== state.day) return;
@@ -213,7 +264,11 @@ function mutate(action, payload) {
         if (a[stage]?.[slot] !== payload.role || !payload.role) return;
         const key=`${state.day}:${stage}:${uid}:${slot}`;
         if (state.history[key]) return;
-        state.history[key]={total:Number(payload.total),natural:payload.natural ?? null};
+        // N/A is legal only for Other Downtime, and consumes the daily check.
+        if (payload.na && !(stage === "camp" && payload.role === "downtime")) return;
+        state.history[key] = payload.na
+          ? {skipped:true,total:null,natural:null}
+          : {total:Number(payload.total),natural:payload.natural ?? null};
       } else if (stage === "watch") {
         if (!a.watch || payload.role !== a.watch) return;
         const key=`${state.day}:watch:${uid}:0`;
@@ -228,8 +283,14 @@ function mutate(action, payload) {
       const chaos=Number(payload.value);
       if (!Number.isInteger(chaos) || chaos < 0 || chaos > 9) return;
       state.chaos=chaos;
+    } else if (action === "pace") {
+      const pace=String(payload.value || "");
+      if (!PACES.some(p => p.id === pace)) return;
+      // A changed pace affects subsequent checks, never rerolls already completed.
+      state.pace=pace;
     } else if (action === "advance") {
-      state.day+=1; state.site={scout:null,guide:null,outcome:null}; state.history={};
+      state.day+=1; state.pace="normal";
+      state.site={scout:null,guide:null,outcome:null}; state.history={};
     } else if (action === "resetDay") {
       // Re-run the CURRENT day: clear its rolls and assignments, including the
       // once-per-day supply-check lock. Depletion is not undone and no supplies
@@ -250,7 +311,7 @@ function mutate(action, payload) {
       if (roll.total <= 2) state.supply.die=SUPPLY_SIZES[SUPPLY_SIZES.indexOf(die)+1] ?? 0;
       await ChatMessage.create({content:roll.total <= 2 ? `<strong>Supplies shrink:</strong> d${die} → ${state.supply.die ? `d${state.supply.die}` : "depleted"}.` : `<strong>Supplies hold:</strong> still d${die}.`});
     } else if (action === "reset") {
-      state.day=1; state.assignments={}; state.history={};
+      state.day=1; state.pace="normal"; state.assignments={}; state.history={};
       state.site={scout:null,guide:null,outcome:null}; state.supply.lastDay=0;
     } else return;
     await save(state);
@@ -334,7 +395,9 @@ class CampBoard extends HandlebarsApplicationMixin(ApplicationV2) {
         canRollExp1:editable&&!!actor&&!!a.exploration?.[1]&&!rolled1,
         canRollCamp0:editable&&!!actor&&!!a.camp?.[0]&&!rolledC0&&a.camp[0]!=="fullrest",
         canRollCamp1:editable&&!!actor&&!!a.camp?.[1]&&!rolledC1&&a.camp[1]!=="fullrest",
-        expResult0:rolled0?.total,expResult1:rolled1?.total,campResult0:rolledC0?.total,campResult1:rolledC1?.total,
+        expResult0:rolled0?.total,expResult1:rolled1?.total,
+        campResult0:rolledC0?.skipped?"N/A":rolledC0?.total,
+        campResult1:rolledC1?.skipped?"N/A":rolledC1?.total,
         expRolled0:!!rolled0,expRolled1:!!rolled1,campRolled0:!!rolledC0,campRolled1:!!rolledC1,
         finder:roleDisplay("finder",a.finder || "",actor,"— Not finding —"),
         watch:selectSimple(WATCHES,a.watch||""),
@@ -353,6 +416,7 @@ class CampBoard extends HandlebarsApplicationMixin(ApplicationV2) {
     const outcome=siteOutcome(state);
     return {
       ...context, day:state.day,dc:state.dc,chaos:state.chaos,players,gm:game.user.isGM,
+      pace:state.pace,paceOptions:PACES.map(p=>({...p,selected:state.pace===p.id})),
       dcOptions:DC_LABELS.map(dc=>({...dc,selected:state.dc===dc.value})),
       supplyDie:state.supply.die,supplyExhausted:!state.supply.die,
       supplyRolled:state.supply.lastDay===state.day,
@@ -360,7 +424,7 @@ class CampBoard extends HandlebarsApplicationMixin(ApplicationV2) {
       canRollSupply:game.user.isGM&&state.supply.lastDay!==state.day&&!!state.supply.die,
       finderCount:finders,findersReady:finders===2,siteOutcome:outcome,
       playerCount:players.length, explorationAssigned, campAssigned,
-      explorationRoles:CATALOG.exploration,campRoles:CATALOG.camp,finderRoles:CATALOG.finder,
+      explorationRoles:guidance("exploration"),campRoles:guidance("camp"),finderRoles:guidance("finder"),
       watchNames:WATCHES.filter(w=>w.id).map(w=>({
         id:w.id,name:w.name,players:players.filter(p=>assignment(state,p.id).watch===w.id).map(p=>p.name).join(", ") || "Unassigned"
       }))
@@ -373,7 +437,7 @@ class CampBoard extends HandlebarsApplicationMixin(ApplicationV2) {
     root.querySelectorAll("[data-ce-field]").forEach(el=>el.addEventListener("change",event=>{
       const target=event.currentTarget;
       const field=target.dataset.ceField;
-      if (field === "dc" || field === "chaos") send(field,{value:target.value});
+      if (field === "dc" || field === "chaos" || field === "pace") send(field,{value:target.value});
       else if (field === "resupply") send("resupply",{value:target.value});
       else send("assign",{userId:target.dataset.userId,field,value:target.value});
     }));
@@ -480,7 +544,8 @@ class CampBoard extends HandlebarsApplicationMixin(ApplicationV2) {
     if(stage === "finder" && state.site[key]?.day===day) return;
     if(stage !== "finder" && state.history[`${day}:${stage}:${userId}:${slot}`]) return;
     const overloaded=(stage==="exploration" || stage==="camp") && (a[stage]||[]).filter(Boolean).length > 1;
-    const checks=roleDef.checks;
+    const checks=stage === "camp" && roleDef.id === "downtime"
+      ? ["na",...Object.keys(SKILLS)] : roleDef.checks;
     let check=checks[0];
     if (checks.length > 1) {
       const optionsHtml=checks.map(c=>`<option value="${c}">${foundry.utils.escapeHTML(SKILLS[c] || OTHER[c] || c)}</option>`).join("");
@@ -488,7 +553,13 @@ class CampBoard extends HandlebarsApplicationMixin(ApplicationV2) {
       if (!choice?.choice) return;
       check=choice.choice;
     }
-    const mode=modeFor(actor,roleDef,check,overloaded);
+    // N/A downtime deliberately avoids skill/modifier dialogs and dice rolls.
+    if (stage === "camp" && roleDef.id === "downtime" && check === "na") {
+      await ChatMessage.create({content:`<strong>${foundry.utils.escapeHTML(actor.name)} — Other Downtime:</strong> No check required (N/A). Day ${day}.`,speaker:ChatMessage.getSpeaker({actor})});
+      await send("recordRoll",{userId,stage,slot,role:key,day,na:true});
+      return;
+    }
+    const mode=modeFor(actor,roleDef,check,overloaded,state.pace);
     // When both proficiency bonus and double duty apply, checks are normal.
     let result;
     try {
@@ -528,7 +599,12 @@ Hooks.once("ready",()=>{
     }
   });
   Hooks.on("updateSetting",(setting)=>{if(setting.key===`${ID}.state`)app?.render();});
-  game.modules.get(ID).api={open:openBoard,resetDay:()=>game.user.isGM ? mutate("resetDay",{fromGM:true}) : notifyProblem("GM only.")};
+  game.modules.get(ID).api={
+    open:openBoard,
+    resetDay:()=>game.user.isGM ? mutate("resetDay",{fromGM:true}) : notifyProblem("GM only."),
+    setPace:(pace)=>game.user.isGM ? mutate("pace",{fromGM:true,value:pace}) : notifyProblem("GM only."),
+    nextDay:()=>game.user.isGM ? mutate("advance",{fromGM:true}) : notifyProblem("GM only.")
+  };
   // Persistent button beside the chat entry for both GMs and players.
   Hooks.on("renderChatLog",(_app,html)=>addLauncher(html));
   Hooks.on("renderChatPopout",(_app,html)=>addLauncher(html));
