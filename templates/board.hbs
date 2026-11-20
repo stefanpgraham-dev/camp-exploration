@@ -32,7 +32,7 @@
         </label>
       {{/each}}
     </div>
-    <p class="ce-footnote">The chosen pace changes matching skill checks on this board for today, including camp and watch checks (homebrew extension). Advantage and disadvantage cancel. Next Day returns to Normal; Reset Day retains the selected pace. GM selects the party pace.</p>
+    <p class="ce-footnote">The chosen pace affects role eligibility and skill colours as a homebrew rule: ordinary proficiency is offset by DIS, Expertise still qualifies, and Slow-pace ADV can qualify untrained Perception/Survival. Dice rolls keep their usual proficiency bonuses. Next Day returns to Normal; Reset Day retains the pace. GM sets the party pace.</p>
   </section>
 
   <section class="ce-panel">
@@ -47,14 +47,14 @@
         {{#each players}}
           <tr>
             <td class="ce-player"><strong>{{name}}</strong><small>{{actorName}}</small></td>
-            <td><button type="button" class="ce-pick" data-ce-action="pick-role" data-ce-field="exploration0" data-user-id="{{id}}" aria-label="Choose exploration duty for {{name}}" {{#unless editable}}disabled{{/unless}}>
+            <td><button type="button" class="ce-pick{{#if exploration0.favourable}} ce-pick--favoured{{else}}{{#if exploration0.penalized}} ce-pick--penalized{{/if}}{{/if}}" data-ce-action="pick-role" data-ce-field="exploration0" data-user-id="{{id}}" aria-label="Choose exploration duty for {{name}}" {{#unless editable}}disabled{{/unless}}>
                 <span class="ce-pick-title">{{exploration0.name}} <i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span>
-                {{#unless exploration0.empty}}<span class="ce-skill-row">{{#each exploration0.skills}}<span class="ce-skill ce-skill--{{state}}" title="{{explanation}}"><span aria-hidden="true">{{prefix}}</span> {{name}}{{#if mandatory}}<b title="Required">*</b>{{/if}}</span>{{/each}}</span>{{/unless}}
+                {{#unless exploration0.empty}}<span class="ce-skill-row">{{#each exploration0.skills}}<span class="ce-skill ce-skill--{{state}}" title="{{explanation}}"><span aria-hidden="true">{{prefix}}</span> {{name}}{{#if effect}} <small class="ce-effect">{{effect}}</small>{{/if}}{{#if mandatory}}<b title="Required">*</b>{{/if}}</span>{{/each}}</span>{{/unless}}
               </button></td>
             <td class="ce-roll-cell"><button type="button" class="ce-roll" data-ce-action="roll" data-stage="exploration" data-slot="0" data-user-id="{{id}}" {{#unless canRollExp0}}disabled{{/unless}}><i class="fa-solid fa-dice-d20"></i> Roll</button>{{#if expRolled0}}<span class="ce-result">{{expResult0}}</span>{{/if}}</td>
-            <td><button type="button" class="ce-pick" data-ce-action="pick-role" data-ce-field="exploration1" data-user-id="{{id}}" aria-label="Choose secondary exploration duty for {{name}}" {{#unless canPickExploration1}}disabled{{/unless}}>
+            <td><button type="button" class="ce-pick{{#if exploration1.favourable}} ce-pick--favoured{{else}}{{#if exploration1.penalized}} ce-pick--penalized{{/if}}{{/if}}" data-ce-action="pick-role" data-ce-field="exploration1" data-user-id="{{id}}" aria-label="Choose secondary exploration duty for {{name}}" {{#unless canPickExploration1}}disabled{{/unless}}>
                 <span class="ce-pick-title">{{exploration1.name}} <i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span>
-                {{#unless exploration1.empty}}<span class="ce-skill-row">{{#each exploration1.skills}}<span class="ce-skill ce-skill--{{state}}" title="{{explanation}}"><span aria-hidden="true">{{prefix}}</span> {{name}}{{#if mandatory}}<b title="Required">*</b>{{/if}}</span>{{/each}}</span>{{/unless}}
+                {{#unless exploration1.empty}}<span class="ce-skill-row">{{#each exploration1.skills}}<span class="ce-skill ce-skill--{{state}}" title="{{explanation}}"><span aria-hidden="true">{{prefix}}</span> {{name}}{{#if effect}} <small class="ce-effect">{{effect}}</small>{{/if}}{{#if mandatory}}<b title="Required">*</b>{{/if}}</span>{{/each}}</span>{{/unless}}
               </button></td>
             <td class="ce-roll-cell"><button type="button" class="ce-roll" data-ce-action="roll" data-stage="exploration" data-slot="1" data-user-id="{{id}}" {{#unless canRollExp1}}disabled{{/unless}}><i class="fa-solid fa-dice-d20"></i> Roll</button>{{#if expRolled1}}<span class="ce-result">{{expResult1}}</span>{{/if}}</td>
           </tr>
@@ -63,7 +63,7 @@
       </table>
     </div>
     <details class="ce-reference"><summary>Exploration role reference &amp; guidance</summary><div class="ce-reference-grid">{{#each explorationRoles}}<p><strong>{{name}}</strong><span>{{note}}</span><small>{{guidance}}</small></p>{{/each}}</div></details>
-    <p class="ce-footnote">Click a role to compare all its skills at a glance. Green ✓ means proficient, blue ★ expertise, red × not proficient, grey ? requires a sheet check. * marks a required proficiency.</p>
+    <p class="ce-footnote">Pace affects role suitability: green ADV indicates a favourable skill (even if untrained), amber DIS offsets ordinary proficiency for role assignment, and blue ★ Expertise remains eligible. ✓ / × still show base training. The dice rolls retain proficiency and apply advantage/disadvantage separately. * marks a required skill.</p>
   </section>
 
   <section class="ce-panel">
@@ -86,9 +86,9 @@
         {{#each players}}
           <tr>
             <td class="ce-player"><strong>{{name}}</strong></td>
-            <td><button type="button" class="ce-pick" data-ce-action="pick-role" data-ce-field="finder" data-user-id="{{id}}" aria-label="Choose campsite-finding duty for {{name}}" {{#unless editable}}disabled{{/unless}}>
+            <td><button type="button" class="ce-pick{{#if finder.favourable}} ce-pick--favoured{{else}}{{#if finder.penalized}} ce-pick--penalized{{/if}}{{/if}}" data-ce-action="pick-role" data-ce-field="finder" data-user-id="{{id}}" aria-label="Choose campsite-finding duty for {{name}}" {{#unless editable}}disabled{{/unless}}>
                 <span class="ce-pick-title">{{finder.name}} <i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span>
-                {{#unless finder.empty}}<span class="ce-skill-row">{{#each finder.skills}}<span class="ce-skill ce-skill--{{state}}" title="{{explanation}}"><span aria-hidden="true">{{prefix}}</span> {{name}}{{#if mandatory}}<b title="Required">*</b>{{/if}}</span>{{/each}}</span>{{/unless}}
+                {{#unless finder.empty}}<span class="ce-skill-row">{{#each finder.skills}}<span class="ce-skill ce-skill--{{state}}" title="{{explanation}}"><span aria-hidden="true">{{prefix}}</span> {{name}}{{#if effect}} <small class="ce-effect">{{effect}}</small>{{/if}}{{#if mandatory}}<b title="Required">*</b>{{/if}}</span>{{/each}}</span>{{/unless}}
               </button></td>
             <td class="ce-roll-cell"><button type="button" class="ce-roll" data-ce-action="roll" data-stage="finder" data-user-id="{{id}}" {{#unless canRollFinder}}disabled{{/unless}}><i class="fa-solid fa-dice-d20"></i> Roll</button>{{#if finderRolled}}<span class="ce-result">{{finderTotal}}</span>{{/if}}</td>
           </tr>
@@ -117,14 +117,14 @@
         {{#each players}}
           <tr>
             <td class="ce-player"><strong>{{name}}</strong></td>
-            <td><button type="button" class="ce-pick" data-ce-action="pick-role" data-ce-field="camp0" data-user-id="{{id}}" aria-label="Choose camp duty for {{name}}" {{#unless editable}}disabled{{/unless}}>
+            <td><button type="button" class="ce-pick{{#if camp0.favourable}} ce-pick--favoured{{else}}{{#if camp0.penalized}} ce-pick--penalized{{/if}}{{/if}}" data-ce-action="pick-role" data-ce-field="camp0" data-user-id="{{id}}" aria-label="Choose camp duty for {{name}}" {{#unless editable}}disabled{{/unless}}>
                 <span class="ce-pick-title">{{camp0.name}} <i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span>
-                {{#unless camp0.empty}}<span class="ce-skill-row">{{#each camp0.skills}}<span class="ce-skill ce-skill--{{state}}" title="{{explanation}}"><span aria-hidden="true">{{prefix}}</span> {{name}}{{#if mandatory}}<b title="Required">*</b>{{/if}}</span>{{/each}}</span>{{/unless}}
+                {{#unless camp0.empty}}<span class="ce-skill-row">{{#each camp0.skills}}<span class="ce-skill ce-skill--{{state}}" title="{{explanation}}"><span aria-hidden="true">{{prefix}}</span> {{name}}{{#if effect}} <small class="ce-effect">{{effect}}</small>{{/if}}{{#if mandatory}}<b title="Required">*</b>{{/if}}</span>{{/each}}</span>{{/unless}}
               </button></td>
             <td class="ce-roll-cell"><button type="button" class="ce-roll" data-ce-action="roll" data-stage="camp" data-slot="0" data-user-id="{{id}}" {{#unless canRollCamp0}}disabled{{/unless}}><i class="fa-solid fa-dice-d20"></i> Roll</button>{{#if campRolled0}}<span class="ce-result">{{campResult0}}</span>{{/if}}</td>
-            <td><button type="button" class="ce-pick" data-ce-action="pick-role" data-ce-field="camp1" data-user-id="{{id}}" aria-label="Choose secondary camp duty for {{name}}" {{#unless canPickCamp1}}disabled{{/unless}}>
+            <td><button type="button" class="ce-pick{{#if camp1.favourable}} ce-pick--favoured{{else}}{{#if camp1.penalized}} ce-pick--penalized{{/if}}{{/if}}" data-ce-action="pick-role" data-ce-field="camp1" data-user-id="{{id}}" aria-label="Choose secondary camp duty for {{name}}" {{#unless canPickCamp1}}disabled{{/unless}}>
                 <span class="ce-pick-title">{{camp1.name}} <i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span>
-                {{#unless camp1.empty}}<span class="ce-skill-row">{{#each camp1.skills}}<span class="ce-skill ce-skill--{{state}}" title="{{explanation}}"><span aria-hidden="true">{{prefix}}</span> {{name}}{{#if mandatory}}<b title="Required">*</b>{{/if}}</span>{{/each}}</span>{{/unless}}
+                {{#unless camp1.empty}}<span class="ce-skill-row">{{#each camp1.skills}}<span class="ce-skill ce-skill--{{state}}" title="{{explanation}}"><span aria-hidden="true">{{prefix}}</span> {{name}}{{#if effect}} <small class="ce-effect">{{effect}}</small>{{/if}}{{#if mandatory}}<b title="Required">*</b>{{/if}}</span>{{/each}}</span>{{/unless}}
               </button></td>
             <td class="ce-roll-cell"><button type="button" class="ce-roll" data-ce-action="roll" data-stage="camp" data-slot="1" data-user-id="{{id}}" {{#unless canRollCamp1}}disabled{{/unless}}><i class="fa-solid fa-dice-d20"></i> Roll</button>{{#if campRolled1}}<span class="ce-result">{{campResult1}}</span>{{/if}}</td>
           </tr>
@@ -145,7 +145,7 @@
           {{#each players}}
             <tr><td class="ce-player"><strong>{{name}}</strong></td>
             <td><select data-ce-field="watch" data-user-id="{{id}}" {{#unless editable}}disabled{{/unless}}>{{#each watch}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}</select></td>
-            <td class="ce-roll-cell"><span class="ce-skill ce-skill--{{watchSkill.state}}" title="{{watchSkill.explanation}}">{{watchSkill.prefix}} Perception</span> <button type="button" data-ce-action="roll" data-stage="watch" data-user-id="{{id}}" class="ce-roll" {{#unless canRollWatch}}disabled{{/unless}}><i class="fa-solid fa-dice-d20"></i> Roll</button>{{#if watchRolled}}<span class="ce-result">{{watchResult}}</span>{{/if}}</td>
+            <td class="ce-roll-cell"><span class="ce-skill ce-skill--{{watchSkill.state}}" title="{{watchSkill.explanation}}">{{watchSkill.prefix}} Perception{{#if watchSkill.effect}} <small class="ce-effect">{{watchSkill.effect}}</small>{{/if}}</span> <button type="button" data-ce-action="roll" data-stage="watch" data-user-id="{{id}}" class="ce-roll" {{#unless canRollWatch}}disabled{{/unless}}><i class="fa-solid fa-dice-d20"></i> Roll</button>{{#if watchRolled}}<span class="ce-result">{{watchResult}}</span>{{/if}}</td>
             </tr>
           {{/each}}
           </tbody>

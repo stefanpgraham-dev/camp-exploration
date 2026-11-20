@@ -128,3 +128,29 @@
 .camp-exploration .ce-pace-choice.ce-pace-selected:has(input:disabled):hover { background:#ead8bb; }
 .camp-exploration .ce-reference-grid small { display:block; font-size:11px; line-height:1.4; color:#4e493c; margin-top:5px; }
 @media(max-width:720px) { .camp-exploration .ce-pace-radio { grid-template-columns:1fr; } }
+
+/* v0.3.1 — pace-aware proficiency/suitability: same badge semantics in board + picker. */
+.ce-skill--favoured {
+  color:#14582b; background:#cff0d8; border-color:#5fbd7c;
+}
+.ce-skill--suppressed {
+  color:#76500f; background:#f7e6bc; border-color:#d3af67;
+}
+.ce-skill .ce-effect {
+  display:inline-block; padding:0 3px; margin-left:2px; font:700 9px/1.4 var(--font-primary, sans-serif);
+  border:1px solid currentColor; border-radius:3px; vertical-align:baseline;
+}
+.camp-exploration .ce-pick.ce-pick--favoured {
+  border:2px solid #40995d; background:#f0fbef;
+}
+.camp-exploration .ce-pick.ce-pick--favoured:hover:not(:disabled) {background:#e4f7e4;}
+.camp-exploration .ce-pick.ce-pick--penalized {
+  border:2px solid #b88b42; background:#fff5df;
+}
+.camp-exploration .ce-pick.ce-pick--penalized:hover:not(:disabled) {background:#f9ebcc;}
+.ce-role-option.ce-role-favoured:not(.ce-role-unavailable) {
+  border-left:4px solid #4b9e62;
+}
+.ce-role-option.ce-role-penalized:not(.ce-role-unavailable) {
+  border-left:4px solid #bb8d41;
+}

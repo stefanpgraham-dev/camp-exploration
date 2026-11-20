@@ -121,18 +121,35 @@ function role(stage, key) { return CATALOG[stage]?.find(r => r.id === key); }
 function assignment(state, uid) {
   return state.assignments[uid] || {exploration:["",""],camp:["",""],finder:"",watch:""};
 }
-function eligible(userId, roleDef) {
+// House rule: a pace penalty offsets ordinary proficiency for ROLE ELIGIBILITY;
+// Expertise still qualifies. Slow-pace advantage provides temporary suitability
+// with Perception/Survival even when the character is untrained.
+// Never remove the proficiency bonus from actual D&D 5e rolls.
+function paceEffect(skill, pace="normal") {
+  if (pace === "slow" && ["prc","sur"].includes(skill)) return "advantage";
+  if (pace === "fast" && ["prc","sur","ste"].includes(skill)) return "disadvantage";
+  if (pace === "normal" && skill === "ste") return "disadvantage";
+  return "";
+}
+function effectiveQualification(actor, skill, pace="normal") {
+  if (!actor || !SKILLS[skill]) return false;
+  const rank=Number(actor.system?.skills?.[skill]?.value || 0);
+  const effect=paceEffect(skill,pace);
+  if (effect === "advantage") return true;
+  if (effect === "disadvantage") return rank >= 2;
+  return rank >= 1;
+}
+function eligible(userId, roleDef, pace="normal") {
   if (!roleDef?.required || !SKILLS[roleDef.required]) return true;
-  const actor = actorFor(userId);
-  return !!actor && prof(actor, roleDef.required);
+  return effectiveQualification(actorFor(userId),roleDef.required,pace);
 }
 function modeFor(actor, roleDef, choice, overloaded, pace="normal") {
   const primary = roleDef?.required;
   const pair = roleDef?.pair || [];
   const both = !!primary && prof(actor, primary) && (choice === primary ? pair.some(p => prof(actor, p)) : pair.includes(choice) && prof(actor, choice));
-  const paceAdv = pace === "slow" && ["prc","sur"].includes(choice);
-  const paceDis = (pace === "fast" && ["prc","sur","ste"].includes(choice)) ||
-    (pace === "normal" && choice === "ste");
+  const impact=paceEffect(choice,pace);
+  const paceAdv = impact === "advantage";
+  const paceDis = impact === "disadvantage";
   // 5e: any source of advantage plus any disadvantage cancel, regardless of count.
   const hasAdv = both || paceAdv;
   const hasDis = overloaded || paceDis;
@@ -153,31 +170,51 @@ function naturalFrom(roll) {
   const kept = die.results?.find(r => r.active !== false && r.discarded !== true);
   return Number.isFinite(kept?.result) ? kept.result : null;
 }
-function skillBadges(actor, roleDef) {
+function skillBadges(actor, roleDef, pace="normal") {
   return (roleDef?.checks || []).map(code => {
     const name = SKILLS[code] || OTHER[code] || code;
     const mandatory = roleDef.required === code && !!SKILLS[code];
     let state = "unknown", prefix = "?", explanation = "Check character sheet";
+    let effect = "";
     if (SKILLS[code] && actor) {
       const rank = Number(actor.system?.skills?.[code]?.value || 0);
-      if (rank >= 2) { state = "expertise"; prefix = "★"; explanation = "Expertise"; }
-      else if (rank >= 1) { state = "proficient"; prefix = "✓"; explanation = "Proficient"; }
-      else if (rank > 0) { state = "partial"; prefix = "½"; explanation = "Half proficiency"; }
-      else { state = "untrained"; prefix = "×"; explanation = "Not proficient"; }
+      const training = rank >= 2 ? "Expertise" : rank >= 1 ? "Proficient" : rank > 0 ? "Half proficient" : "Untrained";
+      if (rank >= 2) { state = "expertise"; prefix = "★"; }
+      else if (rank >= 1) { state = "proficient"; prefix = "✓"; }
+      else if (rank > 0) { state = "partial"; prefix = "½"; }
+      else { state = "untrained"; prefix = "×"; }
+      const impact=paceEffect(code,pace);
+      if (impact === "advantage") {
+        state = "favoured";
+        effect = "ADV";
+        explanation = `${training}; advantage from Slow pace. Counts as suitable for this role even if untrained. Roll retains normal proficiency.`;
+      } else if (impact === "disadvantage") {
+        effect = "DIS";
+        state = rank >= 2 ? "expertise" : rank >= 1 ? "suppressed" : "untrained";
+        explanation = rank >= 2
+          ? "Expertise retained for role eligibility; roll has disadvantage and keeps doubled proficiency."
+          : rank >= 1 ? "Pace disadvantage offsets ordinary proficiency for role suitability (homebrew). The dice roll still retains proficiency and has disadvantage."
+          : "Untrained and disadvantaged by travel pace.";
+      } else explanation = training;
     } else if (code === "str") {
       state = "ability"; prefix = "–"; explanation = "Ability check; no skill proficiency needed";
     }
-    return {name, state, prefix, mandatory, explanation};
+    return {name, state, prefix, mandatory, explanation, effect};
   });
 }
-function roleDisplay(stage, key, actor, placeholder) {
+function roleDisplay(stage, key, actor, placeholder, pace="normal") {
   const def = role(stage, key);
-  return {name: def?.name || placeholder, empty: !def, skills:skillBadges(actor, def)};
+  const skills=skillBadges(actor,def,pace);
+  return {
+    name: def?.name || placeholder, empty: !def, skills,
+    favourable:skills.some(s=>s.state === "favoured"),
+    penalized:skills.some(s=>s.state === "suppressed")
+  };
 }
 // Skill chips appear both in selected-role buttons and alongside every option in the picker.
-function skillBadgesHTML(actor, def) {
-  return skillBadges(actor, def).map(({name,state,prefix,mandatory,explanation}) =>
-    `<span class="ce-skill ce-skill--${state}" title="${foundry.utils.escapeHTML(explanation)}${mandatory ? " · Required" : ""}"><span aria-hidden="true">${prefix}</span> ${foundry.utils.escapeHTML(name)}${mandatory ? "<b aria-label=\"Required\">*</b>" : ""}</span>`
+function skillBadgesHTML(actor, def, pace="normal") {
+  return skillBadges(actor, def,pace).map(({name,state,prefix,mandatory,explanation,effect}) =>
+    `<span class="ce-skill ce-skill--${state}" title="${foundry.utils.escapeHTML(explanation)}${mandatory ? " · Required" : ""}"><span aria-hidden="true">${prefix}</span> ${foundry.utils.escapeHTML(name)}${effect ? ` <small class="ce-effect">${effect}</small>` : ""}${mandatory ? "<b aria-label=\"Required\">*</b>" : ""}</span>`
   ).join("");
 }
 function selectSimple(options, selected) {
@@ -226,7 +263,7 @@ function mutate(action, payload) {
       const a = structuredClone(assignment(state, uid));
       if (field === "finder") {
         if (value && !role("finder", value)) return;
-        if (value && !eligible(uid, role("finder",value))) return notifyProblem(`${user.name} needs the first listed proficiency for this role.`);
+        if (value && !eligible(uid, role("finder",value),state.pace)) return notifyProblem(`${user.name} does not meet the required skill with today's pace.`);
         if (value && Object.entries(state.assignments).some(([otherId, other])=> otherId !== uid && other.finder === value)) return notifyProblem(`${role("finder",value).name} is already assigned.`);
         a.finder = value;
         state.site = {scout:null,guide:null,outcome:null};
@@ -236,7 +273,7 @@ function mutate(action, payload) {
       } else if (/^(exploration|camp)[01]$/.test(field)) {
         const stage=field.replace(/[01]$/, ""), idx=Number(field.slice(-1));
         if (value && !role(stage,value)) return;
-        if (value && !eligible(uid,role(stage,value))) return notifyProblem(`${user.name} needs proficiency in ${SKILLS[role(stage,value).required]} for ${role(stage,value).name}.`);
+        if (value && !eligible(uid,role(stage,value),state.pace)) return notifyProblem(`${user.name} does not meet the required skill for ${role(stage,value).name} at today's pace.`);
         const selected=[...(a[stage] || ["",""])];
         if (value && selected[1-idx] === value) return;
         if (stage === "camp" && idx === 1 && (selected[0] === "fullrest" || value === "fullrest")) return;
@@ -380,11 +417,11 @@ class CampBoard extends HandlebarsApplicationMixin(ApplicationV2) {
       const a=assignment(state,user.id), actor=actorFor(user.id);
       const editable=game.user.isGM || game.user.id === user.id;
       const hist=(stage,slot)=>state.history[`${state.day}:${stage}:${user.id}:${slot}`];
-      const choices=(stage,idx)=>roleDisplay(stage,a[stage]?.[idx] || "",actor,idx ? "— No second duty —" : "— Choose a role —");
+      const choices=(stage,idx)=>roleDisplay(stage,a[stage]?.[idx] || "",actor,idx ? "— No second duty —" : "— Choose a role —",state.pace);
       const rolled0=hist("exploration",0),rolled1=hist("exploration",1),rolledC0=hist("camp",0),rolledC1=hist("camp",1);
       return {
         id:user.id,name:user.name,active:user.active,actorName:actor?.name || "No assigned character",
-        editable,hasActor:!!actor,watchSkill:skillBadges(actor,{checks:["prc"]})[0],
+        editable,hasActor:!!actor,watchSkill:skillBadges(actor,{checks:["prc"]},state.pace)[0],
         canPickExploration1:editable && !!a.exploration?.[0],
         canPickCamp1:editable && !!a.camp?.[0] && a.camp[0]!=="fullrest",
         exploration0:choices("exploration",0),exploration1:choices("exploration",1),
@@ -399,7 +436,7 @@ class CampBoard extends HandlebarsApplicationMixin(ApplicationV2) {
         campResult0:rolledC0?.skipped?"N/A":rolledC0?.total,
         campResult1:rolledC1?.skipped?"N/A":rolledC1?.total,
         expRolled0:!!rolled0,expRolled1:!!rolled1,campRolled0:!!rolledC0,campRolled1:!!rolledC1,
-        finder:roleDisplay("finder",a.finder || "",actor,"— Not finding —"),
+        finder:roleDisplay("finder",a.finder || "",actor,"— Not finding —",state.pace),
         watch:selectSimple(WATCHES,a.watch||""),
         finderSelected:!!a.finder,
         finderRolled:!!(a.finder && state.site[a.finder]?.day===state.day),
@@ -474,27 +511,30 @@ class CampBoard extends HandlebarsApplicationMixin(ApplicationV2) {
     const emptyLabel = field === "finder" ? "Not finding campsite" : field.endsWith("1") ? "No second duty" : "Not assigned";
     const options=[{id:"",name:emptyLabel},...CATALOG[stage]];
     const rows=options.map(def=>{
-      const allowed=!def.id || eligible(userId,def);
+      const allowed=!def.id || eligible(userId,def,state.pace);
       const conflicting=stage === "finder" && !!def.id && Object.entries(state.assignments)
         .some(([id,entry])=>id!==userId && entry.finder===def.id);
       const duplicate=!!def.id && !!match && a[stage]?.[1-Number(match[2])]===def.id;
       const secondFullRest=!!match && match[1] === "camp" && match[2] === "1" && def.id === "fullrest";
       const blocked=!!def.id && (conflicting || duplicate || !allowed || secondFullRest);
-      const reason=conflicting ? "Already assigned" : duplicate ? "Already selected" : !allowed ? "Required skill missing" : secondFullRest ? "Not a second duty" : "";
-      return `<label class="ce-role-option${blocked ? " ce-role-unavailable" : ""}">
+      const badges=skillBadges(actor,def,state.pace);
+      const highlight=badges.some(b=>b.state==="favoured") ? " ce-role-favoured"
+        : badges.some(b=>b.state==="suppressed") ? " ce-role-penalized" : "";
+      const reason=conflicting ? "Already assigned" : duplicate ? "Already selected" : !allowed ? "Required skill offset by pace" : secondFullRest ? "Not a second duty" : "";
+      return `<label class="ce-role-option${blocked ? " ce-role-unavailable" : ""}${highlight}">
         <input type="radio" name="role" value="${def.id}" ${def.id === selected ? "checked" : ""} ${blocked ? "disabled" : ""}/>
         <span class="ce-role-option-body"><span class="ce-role-option-head"><strong>${foundry.utils.escapeHTML(def.name)}</strong>${reason ? `<em>${reason}</em>` : ""}</span>
         ${def.note ? `<span class="ce-role-note">${foundry.utils.escapeHTML(def.note)}</span>` : ""}
-        <span class="ce-skill-row">${skillBadgesHTML(actor,def)}</span></span>
+        <span class="ce-skill-row">${skillBadgesHTML(actor,def,state.pace)}</span></span>
       </label>`;
     }).join("");
     const result=await DialogV2.input({window:{title:`Choose ${stage === "finder" ? "campsite finder" : stage} role — ${name}`},
-      content:`<div class="ce-role-dialog"><p>Skill colours refer to <strong>${foundry.utils.escapeHTML(actor?.name || "an unassigned character")}</strong>. <span class="ce-skill ce-skill--proficient">✓ Proficient</span> <span class="ce-skill ce-skill--untrained">× Not proficient</span> <span class="ce-skill ce-skill--expertise">★ Expertise</span> <span class="ce-skill ce-skill--partial">½ Half proficiency</span> <span class="ce-skill ce-skill--unknown">? Check sheet</span><br/><small>* Required proficiency. Tool proficiencies may need manual checking.</small></p><div class="ce-role-choices">${rows}</div></div>`,
+      content:`<div class="ce-role-dialog"><p>Skills for <strong>${foundry.utils.escapeHTML(actor?.name || "an unassigned character")}</strong> · <strong>${foundry.utils.escapeHTML(state.pace.toUpperCase())}</strong> pace.<br/><span class="ce-skill ce-skill--favoured">▲ ADV · pace benefit</span> <span class="ce-skill ce-skill--suppressed">✓ DIS · proficiency offset</span> <span class="ce-skill ce-skill--expertise">★ Expertise</span> <span class="ce-skill ce-skill--proficient">✓ Proficient</span> <span class="ce-skill ce-skill--untrained">× Untrained</span><br/><small>* Required skill. Pace modifies eligibility for roles (homebrew); it does not remove proficiency from dice rolls. Tool proficiency may need manual checking.</small></p><div class="ce-role-choices">${rows}</div></div>`,
       ok:{label:"Assign role"}});
     if (!result || typeof result.role !== "string") return;
     if (result.role === selected) return;
     const chosen=role(stage,result.role);
-    if (chosen && !eligible(userId,chosen)) return notifyProblem("Required skill proficiency is missing.");
+    if (chosen && !eligible(userId,chosen,state.pace)) return notifyProblem("Required skill is not suitable at today's pace.");
     if (chosen && stage === "finder" && Object.entries(safeState().assignments).some(([id,x])=>id!==userId && x.finder===result.role))
       return notifyProblem("This campsite-finding role is already assigned.");
     await send("assign",{userId,field,value:result.role});

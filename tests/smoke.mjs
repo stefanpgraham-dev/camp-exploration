@@ -83,6 +83,8 @@ assert(template.includes('data-ce-action="rest"'));
 assert(template.includes('data-ce-action="resetDay"'));
 assert(template.includes('name="ce-pace"'));
 assert(template.includes('role reference &amp; guidance'));
+assert(template.includes("ce-pick--favoured"));
+assert(template.includes('class="ce-effect"'));
 const socket=handlers['module.camp-exploration'];
 const send=async(action,payload)=>{
   socket({kind:'request',action,payload});
@@ -129,6 +131,17 @@ await send('pace',{value:'fast',fromGM:true});
 assert.equal(current.pace,'normal');
 await module.api.setPace('fast');
 assert.equal(current.pace,'fast');
+// Fast pace shows the trained Ranger's Perception as amber rather than green.
+let fastCtx=await appRef._prepareContext();
+assert.equal(fastCtx.players.find(p=>p.id==='p1').watchSkill.state,'suppressed');
+assert.equal(fastCtx.players.find(p=>p.id==='p1').watchSkill.effect,'DIS');
+assert.equal(fastCtx.players.find(p=>p.id==='p2').watchSkill.state,'untrained');
+// Expertise stays eligible, but the pace disadvantage is still on the dice.
+p1.character.system.skills.prc.value=2;
+fastCtx=await appRef._prepareContext();
+assert.equal(fastCtx.players.find(p=>p.id==='p1').watchSkill.state,'expertise');
+assert.equal(fastCtx.players.find(p=>p.id==='p1').watchSkill.effect,'DIS');
+p1.character.system.skills.prc.value=1;
 // Fast gives disadvantage on a Perception watch check.
 await appRef._roll("p1","watch",0);
 await new Promise(resolve=>setTimeout(resolve,0));
@@ -147,12 +160,41 @@ await send('recordRoll',{userId:'p1',stage:'exploration',slot:0,role:'scout',day
 assert.equal(current.history['1:exploration:p1:0'].total,17);
 // A Slow pace grants advantage on Perception and Survival, including camp watches.
 await module.api.setPace('slow');
+const slowCtx=await appRef._prepareContext();
+const slowUntrained=slowCtx.players.find(p=>p.id==='p2').watchSkill;
+assert.equal(slowUntrained.state,'favoured');
+assert.equal(slowUntrained.prefix,'×'); // keep base training visible
+assert.equal(slowUntrained.effect,'ADV');
+assert.equal(slowCtx.players.find(p=>p.id==='p1').exploration0.favourable,true);
+// Homebrew eligibility: Slow permits an untrained Perception user to select Scout.
+nextRoleChoice='scout';
+await appRef._pickRole('p2','exploration0');
+await new Promise(resolve=>setTimeout(resolve,0));
+assert.equal(current.assignments.p2.exploration[0],'scout');
+nextRoleChoice='guide';
+await appRef._pickRole('p2','exploration0');
+await new Promise(resolve=>setTimeout(resolve,0));
+assert.equal(current.assignments.p2.exploration[0],'guide');
+nextRoleChoice=null;
 delete current.history['1:watch:p1:0']; // isolated test for another check
 await appRef._roll("p1","watch",0);
 await new Promise(resolve=>setTimeout(resolve,0));
 assert.equal(rollCalls.at(-1).options.advantage,true);
 // Normal pace applies disadvantage on Stealth, including Other Downtime choices.
 await module.api.setPace('normal');
+// Normal Stealth penalty offsets an ordinary proficiency for role suitability,
+// but Expertise remains visibly blue and sufficient.
+p1.character.system.skills.ste={value:1};
+let normalCtx=await appRef._prepareContext();
+let stealthBadge=normalCtx.players.find(p=>p.id==='p1').exploration0.skills.find(x=>x.name==='Stealth');
+assert.equal(stealthBadge.state,'suppressed');
+assert.equal(stealthBadge.effect,'DIS');
+p1.character.system.skills.ste.value=2;
+normalCtx=await appRef._prepareContext();
+stealthBadge=normalCtx.players.find(p=>p.id==='p1').exploration0.skills.find(x=>x.name==='Stealth');
+assert.equal(stealthBadge.state,'expertise');
+assert.equal(stealthBadge.effect,'DIS');
+p1.character.system.skills.ste.value=0;
 await send('assign',{userId:'p2',field:'camp0',value:'downtime'});
 nextCheckChoice='ste';
 await appRef._roll("p2","camp",0);

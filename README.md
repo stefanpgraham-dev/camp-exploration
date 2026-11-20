@@ -8,7 +8,7 @@ A small shared party board for a D&D 5e homebrew travel and camping procedure. D
 - Exactly two *different* players find a campsite: one **Scout** and one **Guide**, against a GM-chosen terrain DC. Two passes permit a long rest; one pass indicates a reasonable camp where the GM judges whether a long rest is possible; neither pass allows only a short rest. The **GM-only Party rest** button explicitly invokes the D&D 5e short/long rest workflow for each assigned player character after confirmation.
 - Players can opt in to **First, Second, Third, or Fourth Watch** (four two-hour slots), or take no watch. Watch checks use Perception. Multiple characters can share a watch, but one person can be assigned to only one watch.
 - **Role pickers display the character’s skills** without leaving the board: green ✓ for proficiency, blue ★ for expertise, amber ½ for half proficiency, red × for no proficiency, and grey ? where a tool/manual check cannot be automatically verified. An asterisk marks required proficiency. Unavailable options explain why they cannot be selected.
-- A **Travel Pace** radio choice at the top of the board controls the whole party for that day: **Fast +25%**, **Normal**, **Slow −25%**. No fixed mileage is calculated. Fast imposes disadvantage on Perception, Survival and Stealth checks; Normal imposes disadvantage on Stealth checks; Slow grants advantage on Perception and Survival checks. These modifiers affect matching checks in **every phase of this board** (including camp/watch) as requested; applying pace effects outside actual travel is a deliberate homebrew extension of D&D 2024 travel-pace rules. Advantage and disadvantage cancel regardless of source. The GM selects the pace; **Next Day** reverts to Normal, while **Reset Day** keeps the current day's pace.
+- A **Travel Pace** radio choice at the top of the board controls the whole party for that day: **Fast +25%**, **Normal**, **Slow −25%**. No fixed mileage is calculated. Fast imposes disadvantage on Perception, Survival and Stealth checks; Normal imposes disadvantage on Stealth checks; Slow grants advantage on Perception and Survival checks. **Pace-aware role suitability (homebrew):** A disadvantage from the travel pace offsets ordinary proficiency for assigning roles (but not Expertise), while Slow-pace advantage makes any character suitable for roles requiring Perception or Survival, even if untrained. The board and role picker show green `ADV`, amber `DIS` (suppressed proficiency), and blue `★` Expertise with `DIS` where relevant. Base training remains visible (`✓`, `×` or `★`). **The actual D&D 5e skill roll always keeps the character’s proficiency bonus** and applies advantage/disadvantage using the normal rules; the eligibility rule does not alter the underlying character sheet. These modifiers affect matching checks in **every phase of this board** (including camp/watch) as requested; applying pace effects outside actual travel is a deliberate homebrew extension of D&D 2024 travel-pace rules. Advantage and disadvantage cancel regardless of source. The GM selects the pace; **Next Day** reverts to Normal, while **Reset Day** keeps the current day's pace.
 - Each expanded role reference shows a short **guidance description** of what its duty represents, without new rolls or automatic consequences. **Other Downtime** now offers all 18 standard skills and **N/A** on clicking Roll; choosing a skill uses the native character check, and N/A records completion without rolling.
 - Journey duties are rolled once per duty per day. D&D 5e's native skill-check API handles regular skills, allowing normal character bonuses and integrations. Natural 1/20 on the kept die posts a narrative prompt, with **no automated mechanical effect**.
 - If proficient in the first listed skill and a complementary skill, grant advantage; when also serving two duties the advantage and disadvantage cancel. For roles with more than one check, the player chooses which to make.
@@ -32,7 +32,7 @@ A small shared party board for a D&D 5e homebrew travel and camping procedure. D
 
 ### GitHub release / manifest URL
 
-Publish this source as the root of a new GitHub repository. On your GitHub repo's **Settings → Actions → General**, allow workflows to read and write contents if needed. Pushing a version change on the `main` branch automatically runs tests and publishes `module.json` and `camp-exploration.zip` as a GitHub release with the tag matching `module.json` (e.g. `v0.3.0`).
+Publish this source as the root of a new GitHub repository. On your GitHub repo's **Settings → Actions → General**, allow workflows to read and write contents if needed. Pushing a version change on the `main` branch automatically runs tests and publishes `module.json` and `camp-exploration.zip` as a GitHub release with the tag matching `module.json` (e.g. `v0.3.1`).
 
 **Then use this URL in Foundry's Install Module → Manifest URL:**
 
@@ -45,7 +45,7 @@ The generated release manifest contains the correct `manifest` and `download` li
 To build without GitHub Actions:
 
 ```bash
-python tools/package.py --repo stefanpgraham-dev/camp-exploration --version 0.3.0
+python tools/package.py --repo stefanpgraham-dev/camp-exploration --version 0.3.1
 ```
 
 Upload both files from `dist/` as assets on the same GitHub release.
@@ -71,4 +71,4 @@ Upload both files from `dist/` as assets on the same GitHub release.
 
 ## Developer notes
 
-Source module id: `camp-exploration`. No external dependencies. Version `0.3.0`.
+Source module id: `camp-exploration`. No external dependencies. Version `0.3.1`.
