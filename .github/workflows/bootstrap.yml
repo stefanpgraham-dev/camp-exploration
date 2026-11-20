@@ -1,0 +1,64 @@
+name: Bootstrap Camp & Exploration v0.1.0
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'payload/**'
+      - '.github/workflows/bootstrap.yml'
+permissions:
+  contents: write
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Verify and unpack source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat payload/part{1,2,3,4}.txt > /tmp/camp-payload.b64
+          echo 'c644fbab6fa77272c34584c5501151d744097ce3c78d29b758eafb66c2829efb  /tmp/camp-payload.b64' | sha256sum --check
+          python -m pip install --disable-pip-version-check brotli
+          python - <<'PY'
+          import base64, brotli, io, pathlib, tarfile
+          root = pathlib.Path(".").resolve()
+          archive = brotli.decompress(base64.b64decode(pathlib.Path("/tmp/camp-payload.b64").read_text()))
+          with tarfile.open(fileobj=io.BytesIO(archive), mode="r:") as tar:
+              for member in tar:
+                  dest = (root / member.name).resolve()
+                  if not dest.is_relative_to(root):
+                      raise ValueError("Archive contains an unsafe path")
+              tar.extractall(root, filter="data")
+          PY
+      - name: Validate module source
+        run: |
+          node --check scripts/camp-exploration.mjs
+          node tests/smoke.mjs
+          python -m json.tool module.json > /dev/null
+      - name: Build release files
+        run: python tools/package.py --repo "$GITHUB_REPOSITORY" --version "0.1.0"
+      - name: Commit extracted source files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add module.json LICENSE scripts styles templates tests tools .github/workflows/release.yml
+          git rm -r payload
+          git rm .github/workflows/bootstrap.yml
+          git commit -m "Publish editable Camp & Exploration v0.1.0 source"
+          git push origin HEAD:main
+      - name: Publish v0.1.0 release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.0
+          target_commitish: main
+          name: Camp & Exploration v0.1.0
+          body: |
+            Initial Foundry VTT v14 release of the Camp & Exploration module.
+            Includes the shared party board, role assignments, campsite finding, watches, supply dice and natural 1/20 prompts.
+          files: |
+            dist/module.json
+            dist/camp-exploration.zip
