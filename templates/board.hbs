@@ -1,0 +1,137 @@
+<div class="ce-board">
+  <header class="ce-banner">
+    <div>
+      <h1><i class="fa-solid fa-compass"></i> Camp & Exploration</h1>
+      <p>Journey day <strong>{{day}}</strong> &middot; Players choose their own duties. A natural 1 or 20 is a narrative prompt.</p>
+      <p class="ce-progress">Assigned: <strong>{{explorationAssigned}}/{{playerCount}}</strong> exploration &middot; <strong>{{campAssigned}}/{{playerCount}}</strong> campsite &middot; <strong>{{finderCount}}/2</strong> finders</p>
+    </div>
+    <div class="ce-banner-right">
+      <span class="ce-tag">Chaos factor <strong>{{chaos}}</strong></span>
+      {{#if gm}}
+        <label class="ce-inline">Adjust <input class="ce-chaos-input" data-ce-field="chaos" type="number" min="0" max="9" value="{{chaos}}" /></label>
+        <button type="button" data-ce-action="advance"><i class="fa-solid fa-forward-step"></i> Next day</button>
+      {{/if}}
+    </div>
+  </header>
+
+  <section class="ce-panel">
+    <div class="ce-section-heading">
+      <h2><i class="fa-solid fa-route"></i> Exploration roles</h2>
+      <p>Each player chooses a primary role. A second duty is optional but imposes disadvantage on both duty checks (cancelled by advantage).</p>
+    </div>
+    <div class="ce-scroll">
+      <table>
+        <thead><tr><th>Player / character</th><th>Primary duty</th><th>Roll</th><th>Second duty (optional)</th><th>Roll</th></tr></thead>
+        <tbody>
+        {{#each players}}
+          <tr>
+            <td class="ce-player"><strong>{{name}}</strong><small>{{actorName}}</small></td>
+            <td><select data-ce-field="exploration0" data-user-id="{{id}}" {{#unless editable}}disabled{{/unless}}>{{#each exploration0}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}</select></td>
+            <td class="ce-roll-cell"><button type="button" class="ce-roll" data-ce-action="roll" data-stage="exploration" data-slot="0" data-user-id="{{id}}" {{#unless canRollExp0}}disabled{{/unless}}><i class="fa-solid fa-dice-d20"></i> Roll</button>{{#if expRolled0}}<span class="ce-result">{{expResult0}}</span>{{/if}}</td>
+            <td><select data-ce-field="exploration1" data-user-id="{{id}}" {{#unless editable}}disabled{{/unless}}>{{#each exploration1}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}</select></td>
+            <td class="ce-roll-cell"><button type="button" class="ce-roll" data-ce-action="roll" data-stage="exploration" data-slot="1" data-user-id="{{id}}" {{#unless canRollExp1}}disabled{{/unless}}><i class="fa-solid fa-dice-d20"></i> Roll</button>{{#if expRolled1}}<span class="ce-result">{{expResult1}}</span>{{/if}}</td>
+          </tr>
+        {{/each}}
+        </tbody>
+      </table>
+    </div>
+    <details class="ce-reference"><summary>Exploration role skill reference</summary><div class="ce-reference-grid">{{#each explorationRoles}}<p><strong>{{name}}</strong><span>{{note}}</span></p>{{/each}}</div></details>
+    <p class="ce-footnote">Required first-listed skill proficiency is checked for standard skills. Tool proficiency is not automatically verified.</p>
+  </section>
+
+  <section class="ce-panel">
+    <div class="ce-section-heading">
+      <h2><i class="fa-solid fa-map-location-dot"></i> Find a campsite</h2>
+      <p><strong>Two different players</strong> must volunteer: one Scout and one Guide. Each makes a check against the GM's terrain DC.</p>
+    </div>
+    <div class="ce-config-line">
+      <label>Terrain difficulty
+        <select data-ce-field="dc" {{#unless gm}}disabled{{/unless}}>
+          {{#each dcOptions}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
+        </select>
+      </label>
+      <span class="ce-tag">{{finderCount}} of 2 finders assigned</span>
+    </div>
+    <div class="ce-scroll">
+      <table>
+        <thead><tr><th>Player</th><th>Campsite-finding duty</th><th>Check</th></tr></thead>
+        <tbody>
+        {{#each players}}
+          <tr>
+            <td class="ce-player"><strong>{{name}}</strong></td>
+            <td><select data-ce-field="finder" data-user-id="{{id}}" {{#unless editable}}disabled{{/unless}}>{{#each finder}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}</select></td>
+            <td class="ce-roll-cell"><button type="button" class="ce-roll" data-ce-action="roll" data-stage="finder" data-user-id="{{id}}" {{#unless canRollFinder}}disabled{{/unless}}><i class="fa-solid fa-dice-d20"></i> Roll</button>{{#if finderRolled}}<span class="ce-result">{{finderTotal}}</span>{{/if}}</td>
+          </tr>
+        {{/each}}
+        </tbody>
+      </table>
+    </div>
+    {{#if siteOutcome}}
+      <div class="ce-outcome"><strong>{{siteOutcome.title}}</strong><span>{{siteOutcome.description}}</span></div>
+    {{else}}
+      <p class="ce-hint">{{#if findersReady}}Both finders assigned. Roll both checks to determine the campsite.{{else}}Assign one Scout and one Guide before rolling.{{/if}}</p>
+    {{/if}}
+    <details class="ce-reference"><summary>Campsite-finding skill reference</summary><div class="ce-reference-grid">{{#each finderRoles}}<p><strong>{{name}}</strong><span>{{note}}</span></p>{{/each}}</div></details>
+    <p class="ce-footnote">Two successes: good campsite for a long rest. One success: reasonable campsite, possible long rest (GM decision). Both fail: short rest only. DC 0, 5, 10, 15, 20, 25, 30 are taken from the supplied rules.</p>
+  </section>
+
+  <section class="ce-panel">
+    <div class="ce-section-heading">
+      <h2><i class="fa-solid fa-campground"></i> Campsite roles</h2>
+      <p>Everyone chooses a camp duty, including <em>Full Rest</em> if not taking an active duty. As above, a second duty is optional and carries disadvantage.</p>
+    </div>
+    <div class="ce-scroll">
+      <table>
+        <thead><tr><th>Player</th><th>Primary duty</th><th>Roll</th><th>Second duty (optional)</th><th>Roll</th></tr></thead>
+        <tbody>
+        {{#each players}}
+          <tr>
+            <td class="ce-player"><strong>{{name}}</strong></td>
+            <td><select data-ce-field="camp0" data-user-id="{{id}}" {{#unless editable}}disabled{{/unless}}>{{#each camp0}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}</select></td>
+            <td class="ce-roll-cell"><button type="button" class="ce-roll" data-ce-action="roll" data-stage="camp" data-slot="0" data-user-id="{{id}}" {{#unless canRollCamp0}}disabled{{/unless}}><i class="fa-solid fa-dice-d20"></i> Roll</button>{{#if campRolled0}}<span class="ce-result">{{campResult0}}</span>{{/if}}</td>
+            <td><select data-ce-field="camp1" data-user-id="{{id}}" {{#unless editable}}disabled{{/unless}}>{{#each camp1}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}</select></td>
+            <td class="ce-roll-cell"><button type="button" class="ce-roll" data-ce-action="roll" data-stage="camp" data-slot="1" data-user-id="{{id}}" {{#unless canRollCamp1}}disabled{{/unless}}><i class="fa-solid fa-dice-d20"></i> Roll</button>{{#if campRolled1}}<span class="ce-result">{{campResult1}}</span>{{/if}}</td>
+          </tr>
+        {{/each}}
+        </tbody>
+      </table>
+    </div>
+    <details class="ce-reference"><summary>Campsite role skill reference</summary><div class="ce-reference-grid">{{#each campRoles}}<p><strong>{{name}}</strong><span>{{note}}</span></p>{{/each}}</div></details>
+  </section>
+
+  <div class="ce-lower-grid">
+    <section class="ce-panel">
+      <div class="ce-section-heading"><h2><i class="fa-solid fa-moon"></i> Campsite watches</h2><p>Optional: each player can take one of three watches, or none.</p></div>
+      <div class="ce-scroll">
+        <table>
+          <thead><tr><th>Player</th><th>Watch assignment</th><th>Perception</th></tr></thead>
+          <tbody>
+          {{#each players}}
+            <tr><td class="ce-player"><strong>{{name}}</strong></td>
+            <td><select data-ce-field="watch" data-user-id="{{id}}" {{#unless editable}}disabled{{/unless}}>{{#each watch}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}</select></td>
+            <td class="ce-roll-cell"><button type="button" data-ce-action="roll" data-stage="watch" data-user-id="{{id}}" class="ce-roll" {{#unless canRollWatch}}disabled{{/unless}}><i class="fa-solid fa-dice-d20"></i> Roll</button>{{#if watchRolled}}<span class="ce-result">{{watchResult}}</span>{{/if}}</td>
+            </tr>
+          {{/each}}
+          </tbody>
+        </table>
+      </div>
+      <div class="ce-watch-summary">{{#each watchNames}}<p><strong>{{name}}:</strong> {{players}}</p>{{/each}}</div>
+    </section>
+    <section class="ce-panel">
+      <div class="ce-section-heading"><h2><i class="fa-solid fa-box-open"></i> Supply die</h2><p>Check once per journey day. On a 1 or 2, step the die down one size.</p></div>
+      <div class="ce-supply-die">{{#if supplyExhausted}}Depleted{{else}}d{{supplyDie}}{{/if}}</div>
+      <p class="ce-footnote">Resupply to d8: party supplies &middot; d10: pack animals/mounts &middot; d12: wagons/mounts. Dice step down d12 → d10 → d8 → d6 → d4 → depleted.</p>
+      {{#if gm}}
+        <div class="ce-supply-actions">
+          <button type="button" data-ce-action="supply" {{#unless canRollSupply}}disabled{{/unless}}><i class="fa-solid fa-dice"></i> Check supply</button>
+          <label>Resupply <select data-ce-field="resupply"><option value="">Choose…</option>{{#each supplyOptions}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}</select></label>
+        </div>
+        <button type="button" class="ce-muted-button" data-ce-action="reset">Start new expedition</button>
+      {{else}}
+        <p class="ce-hint">The GM manages supplies and journey days.</p>
+      {{/if}}
+      {{#if supplyRolled}}<p class="ce-hint">Today's supply check is complete.</p>{{/if}}
+    </section>
+  </div>
+  <footer class="ce-footer">Foundry v14 &middot; D&D 5e &middot; Results are advisory; this module does not automatically grant rests or apply event effects.</footer>
+</div>
