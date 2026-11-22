@@ -30,6 +30,8 @@ The following role groups were audited against the supplied rules reference:
 
 The Leader's paired alternatives are interpreted as two groups based on the conjunction in the supplied sheet. Tool checks have explicit confirmation for proficiency-based paired advantage. This module never adds new mandatory rolls to resolve these duties.
 
+- **GM broadcast launcher:** The **Show to players** button sends a GM-controlled world-setting update to open the board on connected player clients. It does not change assignments.
+
 - **Role-selection dialog layout:** the proficiency key is placed in a responsive wrapping row, with the rule explanation below it. Neither the legend nor long role labels should force a narrow Foundry dialog to overflow horizontally.\n\n## Installation
 
 ### Install ZIP locally
@@ -42,10 +44,11 @@ The Leader's paired alternatives are interpreted as two groups based on the conj
    game.modules.get("camp-exploration").api.open();
    ```
    A launcher also appears in chat where supported by the current Foundry chat sidebar markup.
+5. GMs can press **Show to players** in the board header to open or raise the Camp & Exploration window for every connected player, without changing journey progress. Offline players are unaffected.
 
 ### GitHub release / manifest URL
 
-Publish this source as the root of a new GitHub repository. On your GitHub repo's **Settings → Actions → General**, allow workflows to read and write contents if needed. Pushing a version change on the `main` branch automatically runs tests and publishes `module.json` and `camp-exploration.zip` as a GitHub release with the tag matching `module.json` (e.g. `v0.3.4`).
+Publish this source as the root of a new GitHub repository. On your GitHub repo's **Settings → Actions → General**, allow workflows to read and write contents if needed. Pushing a version change on the `main` branch automatically runs tests and publishes `module.json` and `camp-exploration.zip` as a GitHub release with the tag matching `module.json` (e.g. `v0.3.5`).
 
 **Then use this URL in Foundry's Install Module → Manifest URL:**
 
@@ -58,7 +61,7 @@ The generated release manifest contains the correct `manifest` and `download` li
 To build without GitHub Actions:
 
 ```bash
-python tools/package.py --repo stefanpgraham-dev/camp-exploration --version 0.3.4
+python tools/package.py --repo stefanpgraham-dev/camp-exploration --version 0.3.5
 ```
 
 Upload both files from `dist/` as assets on the same GitHub release.
@@ -84,4 +87,4 @@ Upload both files from `dist/` as assets on the same GitHub release.
 
 ## Developer notes
 
-Source module id: `camp-exploration`. No external dependencies. Version `0.3.4`.
+Source module id: `camp-exploration`. No external dependencies. Version `0.3.5`.

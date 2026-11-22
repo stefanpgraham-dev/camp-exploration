@@ -538,7 +538,8 @@ class CampBoard extends HandlebarsApplicationMixin(ApplicationV2) {
     root.querySelectorAll("[data-ce-action]").forEach(el=>el.addEventListener("click",async event=>{
       const target=event.currentTarget;
       const action=target.dataset.ceAction;
-      if (action === "pick-role") await this._pickRole(target.dataset.userId,target.dataset.ceField);
+      if (action === "show-players") await showBoardToPlayers();
+       else if (action === "pick-role") await this._pickRole(target.dataset.userId,target.dataset.ceField);
       else if (action === "roll") await this._roll(target.dataset.userId,target.dataset.stage,Number(target.dataset.slot||0));
       else if (action === "rest") await this._restParty();
       else if (["supply","advance","resetDay","reset"].includes(action)) {
@@ -710,6 +711,8 @@ class CampBoard extends HandlebarsApplicationMixin(ApplicationV2) {
 
 Hooks.once("init",()=>{
   game.settings.register(ID,"state",{name:"Camp & Exploration state",scope:"world",config:false,type:Object,default:foundry.utils.deepClone(DEFAULT_STATE)});
+  // World-scoped GM-only signal to open clients' local boards.
+  game.settings.register(ID,"openRequest",{name:"Open Camp Board for Players",scope:"world",config:false,type:String,default:""});
   game.keybindings.register(ID,"openBoard",{name:"Open Camp & Exploration",editable:[{key:"KeyJ",modifiers:["SHIFT"]}],onDown:()=>{openBoard();return true;},restricted:false});
 });
 Hooks.once("ready",()=>{
@@ -720,9 +723,13 @@ Hooks.once("ready",()=>{
       if (["assign","recordRoll"].includes(data.action)) mutate(data.action,data.payload||{});
     }
   });
-  Hooks.on("updateSetting",(setting)=>{if(setting.key===`${ID}.state`)app?.render();});
+  Hooks.on("updateSetting",(setting)=>{
+    if(setting.key===`${ID}.state`)app?.render();
+    if(setting.key===`${ID}.openRequest` && !game.user.isGM)openBoard();
+  });
   game.modules.get(ID).api={
     open:openBoard,
+    openForPlayers:showBoardToPlayers,
     resetDay:()=>game.user.isGM ? mutate("resetDay",{fromGM:true}) : notifyProblem("GM only."),
     setPace:(pace)=>game.user.isGM ? mutate("pace",{fromGM:true,value:pace}) : notifyProblem("GM only."),
     nextDay:()=>game.user.isGM ? mutate("advance",{fromGM:true}) : notifyProblem("GM only.")
@@ -736,7 +743,18 @@ Hooks.once("ready",()=>{
 });
 function openBoard() {
   if(!app) app=new CampBoard();
-  app.render({force:true});
+  const rendering=app.render({force:true});
+  Promise.resolve(rendering).then(()=>app?.bringToFront?.()).catch(error=>console.warn(`${ID} | Could not focus board`,error));
+  return rendering;
+}
+async function showBoardToPlayers() {
+  if(!game.user?.isGM)return notifyProblem("Only a GM can open the board for all players.");
+  const connected=game.users.filter(user=>user.active && !user.isGM);
+  if(!connected.length)return notifyProblem("No players are currently connected.");
+  // GM-authenticated world setting; a new value always triggers a fresh update.
+  await game.settings.set(ID,"openRequest",foundry.utils.randomID());
+  ui.notifications.info?.(`Camp & Exploration: requested the board for ${connected.length} connected player${connected.length===1?"":"s"}.`);
+  return connected.length;
 }
 function addLauncher(html) {
   const root=html instanceof HTMLElement ? html : html?.[0];

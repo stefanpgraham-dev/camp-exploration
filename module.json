@@ -3,19 +3,29 @@
   "title": "Camp & Exploration",
   "description": "A lightweight shared journey, campsite, watch and supply board for D&D 5e homebrew in Foundry VTT.",
   "type": "module",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "compatibility": {
     "minimum": "14",
     "verified": "14"
   },
   "relationships": {
     "systems": [
-      {"id": "dnd5e", "type": "system", "compatibility": {"minimum": "5"}}
+      {
+        "id": "dnd5e",
+        "type": "system",
+        "compatibility": {
+          "minimum": "5"
+        }
+      }
     ]
   },
   "socket": true,
-  "esmodules": ["scripts/camp-exploration.mjs"],
-  "styles": ["styles/camp-exploration.css"],
+  "esmodules": [
+    "scripts/camp-exploration.mjs"
+  ],
+  "styles": [
+    "styles/camp-exploration.css"
+  ],
   "readme": "README.md",
   "license": "LICENSE"
 }

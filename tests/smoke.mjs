@@ -1,6 +1,8 @@
 /* Node smoke tests. These are NOT substitutes for a Foundry multi-client test. */
 import assert from "node:assert/strict";
 const callbacks={};
+const extraSettings=new Map();
+let tokenSequence=0;
 let nextRoleChoice = null, nextRestChoice = null, nextCheckChoice=null;
 const restCalls=[], rollCalls=[];
 globalThis.Hooks={
@@ -12,7 +14,7 @@ class Base {
   async _prepareContext(){return {};}
   async _preRender(){}
   _onRender(){}
-  render(){return this;}
+  render(){this.renders=(this.renders||0)+1;return this;}
 }
 globalThis.foundry={
   applications:{api:{ApplicationV2:Base,HandlebarsApplicationMixin:Base=>Base,DialogV2:{
@@ -25,7 +27,8 @@ globalThis.foundry={
   utils:{
     deepClone:o=>structuredClone(o),
     mergeObject:(a,b)=>({...a,...b, supply:{...a.supply,...b.supply},site:{...a.site,...b.site}}),
-    escapeHTML:s=>String(s).replaceAll("<","&lt;")
+    escapeHTML:s=>String(s).replaceAll("<","&lt;"),
+   randomID:()=>`camp-request-${++tokenSequence}`
   }
 };
 const makeActor=(name,skills)=>({id:name,uuid:`Actor.${name}`,type:"character",name,system:{skills:Object.fromEntries(Object.entries(skills).map(([id,value])=>[id,{value}]))},
@@ -56,7 +59,11 @@ globalThis.Roll=class {
 const warnings=[];
 globalThis.ui={notifications:{warn:(s)=>warnings.push(s),error:(s)=>{throw new Error(s);}}};
 globalThis.game={user:gm, users,
-  settings:{register:(_id,_key,options)=>{current=structuredClone(options.default);},get:()=>structuredClone(current),set:async(_id,_key,value)=>{current=structuredClone(value);}},
+  settings:{
+     register:(_id,key,options)=>{if(key==="state")current=structuredClone(options.default);else extraSettings.set(key,structuredClone(options.default));},
+     get:(_id,key)=>structuredClone(key==="state"?current:extraSettings.get(key)),
+     set:async(_id,key,value)=>{if(key==="state")current=structuredClone(value);else extraSettings.set(key,structuredClone(value));for(const cb of callbacks.updateSetting||[])cb({key:`${_id}.${key}`});}
+   },
   socket:{on:(channel,fn)=>handlers[channel]=fn,emit:(channel,data)=>handlers[channel]?.(data)},
   keybindings:{register:()=>{}},modules:{get:()=>module}
 };
@@ -64,8 +71,25 @@ const rules=await import('../scripts/camp-exploration.mjs');
 for(const cb of callbacks.init||[])await cb();
 for(const cb of callbacks.ready||[])await cb();
 assert(typeof module.api.open==='function');
+assert(typeof module.api.openForPlayers==='function');
 module.api.open();
 const appRef=Base.last;
+// GM signal does not change journey state, and distinct clicks send distinct signals.
+const oldState=structuredClone(current);
+assert.equal(await module.api.openForPlayers(),2);
+assert.equal(extraSettings.get("openRequest"),"camp-request-1");
+assert.deepEqual(current,oldState);
+const beforeRender=appRef.renders;
+game.user=p1;
+for(const cb of callbacks.updateSetting||[])cb({key:"camp-exploration.openRequest"});
+assert.equal(appRef.renders,beforeRender+1,"player receives broadcast and opens local board");
+const oldRequest=extraSettings.get("openRequest");
+await module.api.openForPlayers();
+assert.equal(extraSettings.get("openRequest"),oldRequest,"non-GM cannot broadcast");
+game.user=gm;
+assert.equal(await module.api.openForPlayers(),2);
+assert.equal(extraSettings.get("openRequest"),"camp-request-2");
+warnings.length=0;
 const context = await appRef._prepareContext();
 assert.equal(context.playerCount,2);
 // Verify EVERY role against the supplied exploration/campsite rules sheet.
@@ -182,6 +206,8 @@ assert.equal(context.players.find(p=>p.id==="p2").watchSkill.state, "untrained")
 const template = (await import("node:fs")).readFileSync(new URL("../templates/board.hbs",import.meta.url), "utf8");
 assert(template.includes('data-ce-action="pick-role"'));
 assert(template.includes('data-ce-action="rest"'));
+assert(template.includes('data-ce-action="show-players"'));
+assert(template.includes("{{#if gm}}"));
 assert(template.includes('data-ce-action="resetDay"'));
 assert(template.includes('name="ce-pace"'));
 assert(template.includes('role reference &amp; guidance'));
